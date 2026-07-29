@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Document Corrector — Word 用の校閲アドイン</title>
+    <style>
+      :root { color-scheme: light dark; --line: rgba(127,127,127,.35); --dim: #6b7280; --accent: #0078d4; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0 auto; padding: 32px 20px 80px; max-width: 760px; line-height: 1.75;
+        font-family: system-ui, -apple-system, "Hiragino Sans", "Segoe UI", sans-serif;
+      }
+      h1 { font-size: 28px; margin: 0 0 4px; }
+      h2 { font-size: 19px; margin: 40px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+      h3 { font-size: 15px; margin: 22px 0 6px; }
+      .lead { color: var(--dim); margin: 0 0 28px; }
+      table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+      th, td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+      th { background: rgba(127,127,127,.09); font-weight: 600; }
+      code, kbd {
+        font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .9em;
+        background: rgba(127,127,127,.15); padding: 1px 5px; border-radius: 4px;
+      }
+      pre { background: rgba(127,127,127,.12); padding: 12px 14px; border-radius: 6px; overflow-x: auto; }
+      pre code { background: none; padding: 0; }
+      .download {
+        display: inline-block; margin: 8px 0 4px; padding: 13px 22px; border-radius: 8px;
+        background: var(--accent); color: #fff; font-weight: 600; text-decoration: none;
+      }
+      .note {
+        margin: 18px 0; padding: 12px 16px; border-left: 4px solid #c19c00;
+        background: rgba(193,156,0,.09); border-radius: 0 6px 6px 0;
+      }
+      .note p:first-child { margin-top: 0; }
+      .note p:last-child { margin-bottom: 0; }
+      ol li, ul li { margin: 5px 0; }
+      footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--dim); font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <h1>Document Corrector</h1>
+    <p class="lead">
+      研究室の「文章添削チェックリスト」のうち、機械的に判定できる項目を Word の中で点検する拡張機能です。
+      指摘にはチェックリストと同じ色のマーカーを塗るので、手で添削した原稿と見た目が揃います。
+    </p>
+
+    <h2>できること</h2>
+
+    <h3>チェックリストの自動点検（41 項目）</h3>
+    <table>
+      <tr><th>分類</th><th>例</th></tr>
+      <tr><td>文章の可読性</td><td>更に→さらに、〜を有する→〜をもつ、長すぎる文、表記のゆらぎ、句読点の混在</td></tr>
+      <tr><td>書式</td><td>25-30 °C→25–30 °C、-78℃→–78 °C、10mL→10 mL、Figure 1に→Figure 1 に、1H NMR→¹H NMR</td></tr>
+      <tr><td>フォント</td><td>ギリシャ文字の Symbol フォント、和文と欧文の組み合わせ、物理量のイタリック</td></tr>
+      <tr><td>図表</td><td>キャプションのピリオドと配置、本文が引用していない図表、化合物番号の登場順</td></tr>
+      <tr><td>参考文献</td><td>引用番号と句読点の前後、雑誌略称、誌名は斜体・巻も斜体</td></tr>
+    </table>
+    <p>
+      指摘は<strong>ルールごとにまとまって</strong>表示され、［まとめて修正］で一括して直せます。
+      要否は 1 件ずつ確認でき、［無視］したものはいつでも戻せます。
+    </p>
+
+    <h3>原稿の中身を数える 3 つの一覧</h3>
+    <ul>
+      <li><strong>化合物</strong> — 番号ごとの登場回数と、何ページの何段落にあるか。場所を押すとそこへ飛びます。1 回しか出てこない番号（＝同定データの抜け）が一目で分かります。</li>
+      <li><strong>文献</strong> — 引用番号と、末尾の文献リストから拾った書誌。<strong>書誌の無い番号</strong>と<strong>引用されていない文献</strong>に印が付きます。</li>
+      <li><strong>フォントを置換</strong> — 使われている書体の一覧と、まとめて置換する操作。</li>
+    </ul>
+
+    <h3>伝え方は 2 通り</h3>
+    <p>
+      チェックリストの色で<strong>マーカーを塗る</strong>か、指摘文そのものを<strong>Word のコメント</strong>として挿入するか。
+      片付けるボタンは「このアドインが付けたものだけ」と「文書のすべて」に分かれているので、
+      共著者の書き込みを巻き込む心配がありません。
+    </p>
+
+    <h2>導入</h2>
+
+    <p><a class="download" href="document-corrector.manifest.xml" download>マニフェストをダウンロード</a></p>
+    <p style="color: var(--dim); font-size: 14px; margin-top: 4px;">
+      ダウンロードするのはこの 1 ファイルだけです（約 30 KB）。
+    </p>
+
+    <h3>Mac</h3>
+    <ol>
+      <li>上のファイルをダウンロードします。</li>
+      <li>Finder で <kbd>⌘</kbd> + <kbd>⇧</kbd> + <kbd>G</kbd> を押し、次のフォルダを開きます。
+        <pre><code>~/Library/Containers/com.microsoft.Word/Data/Documents/wef</code></pre>
+        <p style="font-size: 14px; margin: 6px 0 0;"><code>wef</code> フォルダが無ければ、その名前で新規作成してください。</p>
+      </li>
+      <li>ダウンロードした <code>document-corrector.manifest.xml</code> をこのフォルダに入れます。</li>
+      <li>Word を <kbd>⌘</kbd> + <kbd>Q</kbd> で完全に終了し、起動し直します。</li>
+      <li>原稿を開き、［ホーム］→［アドイン］から <strong>Document Corrector</strong> を選びます。
+        リボンに <strong>［Corrector］タブ</strong>が現れます。</li>
+    </ol>
+
+    <h3>Windows</h3>
+    <p>
+      共有フォルダを信頼できるカタログとして登録する手順が必要です。
+      <a href="https://learn.microsoft.com/office/dev/add-ins/testing/create-a-network-shared-folder-catalog-for-task-pane-and-content-add-ins">Microsoft の手順</a>
+      に従ってマニフェストを登録してください。
+    </p>
+
+    <div class="note">
+      <p><strong>タブが出ないときは</strong></p>
+      <p>
+        Word を完全に終了してから起動し直したか確認してください。それでも出ない場合、
+        Word のバージョンが古い可能性があります（<strong>Mac 16.61 以降 / Windows 2205 以降</strong>の
+        Microsoft 365 版が必要です）。古い Word でも、［挿入］→［アドイン］からパネルだけは開けます。
+      </p>
+    </div>
+
+    <h2>更新について</h2>
+    <p>ここが少し変わっているので、先に知っておいてください。</p>
+    <table>
+      <tr><th>変わったもの</th><th>あなたの操作</th></tr>
+      <tr><td>点検ルール、判定の改善、パネルの表示</td><td><strong>不要</strong>。次に Word を開いたときには最新になっています</td></tr>
+      <tr><td>リボンのボタン（追加・削除・名前）</td><td>このページから<strong>マニフェストを取り直して入れ直し</strong></td></tr>
+    </table>
+    <p>
+      プログラム本体は毎回この場所から読み込まれるので、ルールの修正は黙って届きます。
+      入れ直しが要るときだけ、パネルの上部に<strong>「新しいバージョンがあります」</strong>と表示されます。
+      それが出るまでは何もしなくて構いません。
+    </p>
+
+    <h2>プライバシー</h2>
+    <ul>
+      <li><strong>文書の内容が外部に送信されることはありません。</strong> 点検はすべてお使いの Word の中で完結します。</li>
+      <li>プログラムの読み込みのため、Word はこのページと同じ場所（GitHub）へ接続します。文書の中身は含まれません。</li>
+      <li>設定（ルールの入り切り、マーカーの色）はお使いの PC の中だけに保存されます。</li>
+      <li>そのため<strong>オフラインでは動作しません</strong>。ネットワークに接続してお使いください。</li>
+    </ul>
+
+    <h2>不具合・要望</h2>
+    <p>
+      <a href="https://github.com/t-shiokawa1/Document-Corrector/issues">GitHub の Issues</a> か、
+      研究室内で直接お知らせください。誤検出の報告は、その箇所の文が分かると直しやすいです。
+    </p>
+
+    <footer>
+      <p>
+        Document Corrector — 深澤研究室 /
+        <a href="https://github.com/t-shiokawa1/Document-Corrector">ソースコード</a>
+      </p>
+    </footer>
+  </body>
+</html>

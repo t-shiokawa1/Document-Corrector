@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Document Corrector</title>
+    <link rel="stylesheet" href="taskpane.css" />
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <script defer src="taskpane.js"></script>
+  </head>
+  <body>
+    <main>
+      <!-- Shown only when the installed manifest is older than the published one.
+           Rule updates arrive on their own and say nothing; this appears when the
+           ribbon itself has changed and the manifest has to be re-installed. -->
+      <section id="update-banner" class="update" hidden>
+        <p class="update-title">新しいバージョンがあります</p>
+        <p id="update-note" class="update-note"></p>
+        <div class="row compact">
+          <button id="update-open" type="button" class="primary">ダウンロードページを開く</button>
+          <button id="update-dismiss" type="button">あとで</button>
+        </div>
+        <p id="update-url" class="update-url" hidden></p>
+      </section>
+
+      <p id="status" class="status">読み込み中…</p>
+
+      <!-- Shown only outside 指摘一覧: the ribbon put the pane in a list view,
+           and this is the way back without hunting for the right button. -->
+      <div id="view-nav" class="row compact" hidden>
+        <button id="back-to-review" type="button">← 指摘一覧に戻る</button>
+      </div>
+
+      <div id="view-review">
+        <section id="summary-section" hidden>
+          <h2>カテゴリ</h2>
+          <p class="lead">チェックを外すと一覧から隠れます（色はチェックリストのマーカーに対応）。</p>
+          <div id="category-filters" class="filters"></div>
+        </section>
+
+        <section id="findings-section" hidden>
+          <h2>指摘一覧</h2>
+          <div id="findings"></div>
+        </section>
+
+        <section id="ignored-section" hidden>
+          <h2>無視した指摘</h2>
+          <p class="lead">パネルを閉じるまで保持されます。［戻す］で一覧に復帰します。</p>
+          <div class="row compact">
+            <button id="restore-all" type="button">すべて戻す</button>
+          </div>
+          <div id="ignored"></div>
+        </section>
+
+        <section id="fonts-section" hidden>
+          <h2>フォント関係</h2>
+          <ul id="font-report"></ul>
+        </section>
+      </div>
+
+      <div id="view-compounds" hidden>
+        <h2>化合物番号</h2>
+        <p class="lead">
+          本文に出てくる番号と、その回数、そして出てくる場所です。番号をクリックすると
+          該当箇所へ順に移動します。<strong>太字の番号</strong>を化合物とみなし、
+          Figure・Table などに続く番号は除きます。「化合物 5」のように語を伴うものと、
+          系列ラベル（5a、1a–f）も数えます。
+        </p>
+        <div id="compounds"></div>
+      </div>
+
+      <div id="view-references" hidden>
+        <h2>文献番号</h2>
+        <p class="lead">
+          本文が引用している番号と、末尾の文献リストから拾った書誌です。番号をクリックすると
+          引用箇所へ順に移動します。書誌の欠けている番号と、引用されていない文献には印が付きます。
+        </p>
+        <div id="references"></div>
+      </div>
+
+      <div id="view-fonts" hidden>
+        <h2>フォントを置換</h2>
+        <p class="lead">
+          使われているフォントの一覧です。置換先を選んで［置換］を押すと、その書体の箇所をまとめて変更します。
+          取り消しは ⌘Z です。
+        </p>
+        <div id="font-usage"></div>
+      </div>
+    </main>
+  </body>
+</html>

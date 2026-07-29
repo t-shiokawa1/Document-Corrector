@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ルール設定</title>
+    <link rel="stylesheet" href="taskpane.css" />
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <script defer src="rules.js"></script>
+  </head>
+  <body class="dialog-page">
+    <header class="dialog-head">
+      <h1>ルール設定</h1>
+      <div class="row compact">
+        <button id="rule-all-on" type="button">すべて有効</button>
+        <button id="rule-all-off" type="button">すべて無効</button>
+        <button id="rule-reset" type="button">既定に戻す</button>
+      </div>
+    </header>
+
+    <!-- One tab per checklist category; filled by rules.ts. -->
+    <div id="rule-tabs" class="tabs"></div>
+
+    <div id="rule-panels" class="dialog-body"></div>
+
+    <footer class="dialog-foot">
+      <span id="rule-count" class="lead"></span>
+      <button id="rule-done" type="button" class="primary">閉じる</button>
+    </footer>
+  </body>
+</html>

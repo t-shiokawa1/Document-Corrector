@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>設定</title>
+    <link rel="stylesheet" href="taskpane.css" />
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <script defer src="settings.js"></script>
+  </head>
+  <body class="dialog-page">
+    <header class="dialog-head">
+      <h1>設定</h1>
+    </header>
+
+    <div id="settings-tabs" class="tabs"></div>
+
+    <div class="dialog-body">
+      <!-- マーカーの色 -->
+      <section id="panel-colors">
+        <p class="lead">
+          指摘を塗るときの色です。Word のマーカーは色数が決まっているので、
+          文書上では選んだ色にいちばん近いマーカー色になります。
+        </p>
+        <div id="marker-colors"></div>
+
+        <h3>その他の色</h3>
+        <div id="other-colors"></div>
+
+        <div class="row compact">
+          <button id="color-reset" type="button">色を既定に戻す</button>
+        </div>
+      </section>
+
+      <!-- 点検のしかた -->
+      <section id="panel-review">
+        <p class="lead">点検の細かさと、修正の書き込みかたを決めます。</p>
+        <label class="field">
+          長すぎる文とみなす字数
+          <input id="max-sentence" type="number" min="40" max="600" step="10" value="200" />
+        </label>
+        <p class="hint">
+          「長すぎる文」ルールの足切りです（既定 200 字）。これを超えた文のうち、
+          区切りなしに 60 字以上続くもの、またはこの字数の 1.5 倍を超えるものだけを指摘します。
+        </p>
+
+        <label class="field">
+          欧文フォント（書式の修正で使います）
+          <input id="body-font" type="text" value="Times New Roman" />
+        </label>
+        <p class="hint">数式や英単語を直すときに、このフォントに揃えます。</p>
+
+        <label class="check"><input id="selection-only" type="checkbox" /> 選択範囲のみを点検する</label>
+        <label class="check"><input id="track-changes" type="checkbox" /> 修正を変更履歴として記録する</label>
+      </section>
+    </div>
+
+    <footer class="dialog-foot">
+      <span class="lead">設定はこのパソコンに保存されます。</span>
+      <button id="settings-done" type="button" class="primary">閉じる</button>
+    </footer>
+  </body>
+</html>

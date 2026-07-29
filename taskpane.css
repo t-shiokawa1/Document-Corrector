@@ -1,0 +1,576 @@
+:root {
+  color-scheme: light dark;
+  font-family: "Segoe UI", system-ui, -apple-system, "Hiragino Sans", sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+h1 {
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+
+h2 {
+  font-size: 14px;
+  margin: 18px 0 6px;
+}
+
+.lead {
+  margin: 0 0 8px;
+  color: #666;
+  font-size: 12px;
+}
+
+code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  background: rgba(127, 127, 127, 0.15);
+  padding: 0 3px;
+  border-radius: 3px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+button {
+  flex: 1 1 auto;
+  padding: 8px 10px;
+  border: 1px solid #0078d4;
+  border-radius: 6px;
+  background: transparent;
+  color: #0078d4;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+button.primary {
+  background: #0078d4;
+  color: #fff;
+}
+
+button:hover {
+  filter: brightness(1.08);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.field input {
+  padding: 6px 8px;
+  border: 1px solid #999;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+}
+
+.options {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.status {
+  margin-top: 14px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(0, 120, 212, 0.1);
+  font-size: 12px;
+}
+
+/* --- 更新の案内 --- */
+
+/* Amber rather than the usual blue: this is the one message in the pane that
+   asks the user to go and do something outside Word. */
+.update {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(193, 156, 0, 0.55);
+  border-left-width: 4px;
+  border-radius: 6px;
+  background: rgba(193, 156, 0, 0.09);
+}
+
+.update-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.update-note {
+  margin: 0 0 8px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.update-url {
+  margin: 8px 0 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+/* --- チェックリストのレビュー UI --- */
+
+.row.compact button {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+details {
+  margin-top: 14px;
+  border-top: 1px solid rgba(127, 127, 127, 0.3);
+  padding-top: 8px;
+}
+
+summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  border-radius: 2px;
+  flex: 0 0 auto;
+}
+
+#findings details {
+  margin-top: 10px;
+  border-top: none;
+  padding-top: 0;
+}
+
+#findings summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.finding {
+  margin: 6px 0;
+  padding: 8px;
+  border: 1px solid rgba(127, 127, 127, 0.35);
+  border-left-width: 4px;
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.finding.severity-fix {
+  border-left-color: #d13438;
+}
+
+.finding.severity-confirm {
+  border-left-color: #c19c00;
+}
+
+.finding.severity-note {
+  border-left-color: #8a8886;
+}
+
+.finding-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #0078d4;
+}
+
+.severity {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 9px;
+  background: rgba(127, 127, 127, 0.2);
+}
+
+.finding-message {
+  margin: 0 0 4px;
+  overflow-wrap: anywhere;
+}
+
+.finding-quote {
+  margin: 0 0 6px;
+  color: #666;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+#font-report {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+}
+
+#font-report li {
+  margin-bottom: 3px;
+  overflow-wrap: anywhere;
+}
+
+#font-report .mismatch {
+  color: #d13438;
+}
+
+.finding.ignored {
+  border-left-color: rgba(127, 127, 127, 0.5);
+  opacity: 0.75;
+}
+
+/* --- 同じ指摘のまとまり --- */
+
+/* The cards inside a group are indented and lose their own frame, so the group
+   reads as one block rather than as a list of look-alike boxes. */
+details.one-by-one {
+  margin: 6px 0 0;
+  border-top: none;
+  padding-top: 0;
+}
+
+/* `#findings summary` is a flex box, which drops the disclosure triangle, and
+   without it this reads as a caption rather than as something to click. */
+details.one-by-one > summary {
+  font-size: 11px;
+  font-weight: 400;
+  color: #666;
+  padding: 2px 0;
+}
+
+details.one-by-one > summary::before {
+  content: "▸";
+  font-size: 9px;
+}
+
+details.one-by-one[open] > summary::before {
+  content: "▾";
+}
+
+details.one-by-one .finding {
+  margin: 4px 0 4px 8px;
+  border-right: none;
+  border-top: none;
+  border-bottom: none;
+  border-radius: 0;
+  padding: 4px 0 4px 8px;
+}
+
+/* --- 化合物・文献の一覧 --- */
+
+/* A dense grid rather than cards: these are facts to scan, not findings to
+   read, and forty compound numbers have to fit on one screen. */
+.inventory {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.inventory-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px 2px 2px;
+  border: 1px solid rgba(127, 127, 127, 0.35);
+  border-radius: 5px;
+}
+
+button.inventory-label {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+/* The label inside a card heading is a button but should read as the heading it
+   replaces, so it keeps the badge's color and loses the button's padding. */
+button.inventory-label.badge {
+  padding: 0;
+  color: #0078d4;
+  text-decoration: underline;
+}
+
+/* The bibliography line. `title` carries the full entry, so this may clip. */
+.reference-entry {
+  overflow-wrap: anywhere;
+}
+
+/* Each 「7ページ 31段落」 is its own destination. Styled as a link rather than a
+   button so a row of eight of them still reads as a line of text. */
+.places {
+  line-height: 1.9;
+}
+
+button.place {
+  flex: 0 0 auto;
+  padding: 1px 4px;
+  border: 1px solid rgba(0, 120, 212, 0.35);
+  border-radius: 4px;
+  background: transparent;
+  color: #0078d4;
+  font-family: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.inventory-count {
+  font-size: 11px;
+  color: #666;
+  white-space: nowrap;
+}
+
+/* --- フォントの置換 --- */
+
+#font-usage select {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid #999;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+}
+
+#font-usage button {
+  flex: 0 0 auto;
+}
+
+#view-nav {
+  margin-bottom: 10px;
+}
+
+#view-nav button {
+  flex: 0 0 auto;
+}
+
+/* --- 設定の別窓（rules.html / settings.html。Office ダイアログ） --- */
+
+/* The window fills its frame: head, tabs and foot pinned, only the body scrolls. */
+.dialog-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 0;
+}
+
+.dialog-page h1 {
+  font-size: 16px;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.dialog-head,
+.dialog-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  flex: 0 0 auto;
+}
+
+.dialog-head {
+  border-bottom: 1px solid rgba(127, 127, 127, 0.3);
+  flex-wrap: wrap;
+}
+
+/* Tabs keep these tall, narrow windows from becoming one endless column.
+   `flex: 0 0 auto` matters: as a flex item the bar would otherwise be squeezed
+   by the scrolling body below it and clip its own labels. There are only a
+   handful of tabs, so they wrap rather than scroll. */
+.tabs {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 8px 12px 0;
+  border-bottom: 1px solid rgba(127, 127, 127, 0.3);
+}
+
+button.tab {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  margin-bottom: -1px;
+}
+
+button.tab.selected {
+  border-color: rgba(127, 127, 127, 0.3);
+  border-bottom: 1px solid Canvas;
+  color: #0078d4;
+  font-weight: 600;
+}
+
+.dialog-foot {
+  border-top: 1px solid rgba(127, 127, 127, 0.3);
+}
+
+.dialog-foot .lead {
+  margin: 0;
+  flex: 1 1 auto;
+}
+
+.dialog-foot button {
+  flex: 0 0 auto;
+}
+
+.dialog-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 10px 12px;
+}
+
+.dialog-body h3 {
+  font-size: 13px;
+  margin: 18px 0 4px;
+}
+
+.hint {
+  margin: 2px 0 10px;
+  color: #666;
+  font-size: 11px;
+}
+
+label.check {
+  display: block;
+  margin: 6px 0;
+  font-size: 12px;
+}
+
+/* --- マーカーの色（settings.html） --- */
+
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  font-size: 12px;
+}
+
+.color-row .swatch {
+  width: 18px;
+  height: 18px;
+}
+
+.color-row .color-label {
+  flex: 1 1 auto;
+  overflow-wrap: anywhere;
+}
+
+.color-row select {
+  flex: 0 0 auto;
+  padding: 4px 6px;
+  border: 1px solid #999;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+}
+
+.rule {
+  margin: 8px 0;
+  padding-left: 6px;
+  border-left: 3px solid rgba(0, 120, 212, 0.35);
+}
+
+.rule.off {
+  opacity: 0.5;
+  border-left-color: rgba(127, 127, 127, 0.4);
+}
+
+.rule-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rule-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.rule-summary,
+.rule-example {
+  margin: 2px 0 0 20px;
+  font-size: 12px;
+  color: #666;
+  overflow-wrap: anywhere;
+}
+
+.rule-example {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+}
+
+details.entries {
+  margin: 4px 0 0 20px;
+  border-top: none;
+  padding-top: 0;
+}
+
+details.entries summary {
+  font-size: 11px;
+  font-weight: 400;
+  color: #666;
+}
+
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0;
+  font-size: 12px;
+}
+
+.severity-tag-fix {
+  color: #d13438;
+}
+
+.severity-tag-confirm {
+  color: #c19c00;
+}
