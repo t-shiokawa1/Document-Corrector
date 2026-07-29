@@ -1,18 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  配布用マニフェスト（GitHub Pages ホスティング）。これが利用者の手に渡るファイル。
-
-  ビルド時に docs/document-corrector.manifest.xml へコピーされ、配布ページから
-  ダウンロードされる。中身（JavaScript・アイコン）は下の URL から毎回読み込まれるので、
-  **ルールを直しただけなら利用者は何もしなくてよい**。
-
-  ⚠️ リボンのボタン・ラベル・アイコン・権限を変えたときは話が別で、利用者に
-  マニフェストを入れ直してもらう必要がある。そのときは <Version> を上げること —
-  タスクパネルが version.json と照合して更新バナーを出す（src/core/version.ts）。
-
-  ローカル開発用は document-corrector.manifest.xml（https://localhost:3000 を指す）。
-  GUID は同じなので、wef フォルダには**どちらか一方だけ**を置くこと。
--->
+<!-- manifest.template.xml から生成（release）。手で直さないこと。 -->
 <OfficeApp
   xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
