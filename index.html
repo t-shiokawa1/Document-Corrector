@@ -40,19 +40,22 @@
       .note p:first-child { margin-top: 0; }
       .note p:last-child { margin-bottom: 0; }
       ol li, ul li { margin: 5px 0; }
-      footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--dim); font-size: 13px; }
     </style>
   </head>
   <body>
     <h1>Document Corrector</h1>
     <p class="lead">
-      研究室の「文章添削チェックリスト」のうち、機械的に判定できる項目を Word の中で点検する拡張機能です。
-      指摘にはチェックリストと同じ色のマーカーを塗るので、手で添削した原稿と見た目が揃います。
+      Document Corrector は、Microsoft Word 上で研究文書や論文原稿の表記、書式、図表、参考文献などを
+      点検する Office アドインです。文書内の問題箇所を検出し、修正候補の確認、一括修正、
+      マーカーやコメントによる指摘の追加を行えます。
+    </p>
+    <p class="lead" style="font-size: 14px;">
+      対応環境は <strong>Microsoft Word for Mac</strong>（Microsoft 365 版）です。
     </p>
 
     <h2>できること</h2>
 
-    <h3>チェックリストの自動点検（41 項目）</h3>
+    <h3>自動点検（45 項目）</h3>
     <table>
       <tr><th>分類</th><th>例</th></tr>
       <tr><td>文章の可読性</td><td>更に→さらに、〜を有する→〜をもつ、長すぎる文、表記のゆらぎ、句読点の混在</td></tr>
@@ -75,19 +78,29 @@
 
     <h3>伝え方は 2 通り</h3>
     <p>
-      チェックリストの色で<strong>マーカーを塗る</strong>か、指摘文そのものを<strong>Word のコメント</strong>として挿入するか。
+      分類ごとの色で<strong>マーカーを塗る</strong>か、指摘文そのものを<strong>Word のコメント</strong>として挿入するか。
       片付けるボタンは「このアドインが付けたものだけ」と「文書のすべて」に分かれているので、
       共著者の書き込みを巻き込む心配がありません。
     </p>
 
+    <h3>使い方はアドインの中にあります</h3>
+    <p>
+      リボンの<strong>［使い方］</strong>を押すと、操作の手順と、消すボタンの違いがパネルに出ます。
+      初めて使うときはここから始めてください。
+    </p>
+
+    <h3>チェック項目の有効化・無効化</h3>
+    <p>
+      使用するチェック項目は、ルール設定画面で個別に有効または無効にできます。
+    </p>
+
     <h2>導入</h2>
 
-    <p><a class="download" href="document-corrector.manifest.xml" download>マニフェストをダウンロード</a></p>
+    <p><a class="download" href="document-corrector.manifest.xml" download>設定ファイルをダウンロード</a></p>
     <p style="color: var(--dim); font-size: 14px; margin-top: 4px;">
       ダウンロードするのはこの 1 ファイルだけです（約 30 KB）。
     </p>
 
-    <h3>Mac</h3>
     <ol>
       <li>上のファイルをダウンロードします。</li>
       <li>Finder で <kbd>⌘</kbd> + <kbd>⇧</kbd> + <kbd>G</kbd> を押し、次のフォルダを開きます。
@@ -100,41 +113,27 @@
         リボンに <strong>［Corrector］タブ</strong>が現れます。</li>
     </ol>
 
-    <h3>Windows</h3>
-    <p>
-      共有フォルダを信頼できるカタログとして登録する手順が必要です。
-      <a href="https://learn.microsoft.com/office/dev/add-ins/testing/create-a-network-shared-folder-catalog-for-task-pane-and-content-add-ins">Microsoft の手順</a>
-      に従ってマニフェストを登録してください。
-    </p>
-
     <div class="note">
       <p><strong>タブが出ないときは</strong></p>
       <p>
         Word を完全に終了してから起動し直したか確認してください。それでも出ない場合、
-        Word のバージョンが古い可能性があります（<strong>Mac 16.61 以降 / Windows 2205 以降</strong>の
-        Microsoft 365 版が必要です）。古い Word でも、［挿入］→［アドイン］からパネルだけは開けます。
+        Word のバージョンが古い可能性があります（<strong>Mac 16.61 以降</strong>の
+        Microsoft 365 版が必要です）。古い Word でも、［ホーム］→［アドイン］からパネルだけは開けます。
       </p>
     </div>
 
     <h2>更新について</h2>
-    <p>ここが少し変わっているので、先に知っておいてください。</p>
-    <table>
-      <tr><th>変わったもの</th><th>あなたの操作</th></tr>
-      <tr><td>点検ルール、判定の改善、パネルの表示</td><td><strong>不要</strong>。次に Word を開いたときには最新になっています</td></tr>
-      <tr><td>リボンのボタン（追加・削除・名前）</td><td>このページから<strong>マニフェストを取り直して入れ直し</strong></td></tr>
-    </table>
     <p>
-      プログラム本体は毎回この場所から読み込まれるので、ルールの修正は黙って届きます。
-      入れ直しが要るときだけ、パネルの上部に<strong>「新しいバージョンがあります」</strong>と表示されます。
-      それが出るまでは何もしなくて構いません。
+      通常の更新は自動的に反映されます。再インストールが必要な場合のみ、このページでお知らせします。
     </p>
 
     <h2>プライバシー</h2>
     <ul>
-      <li><strong>文書の内容が外部に送信されることはありません。</strong> 点検はすべてお使いの Word の中で完結します。</li>
-      <li>プログラムの読み込みのため、Word はこのページと同じ場所（GitHub）へ接続します。文書の中身は含まれません。</li>
-      <li>設定（ルールの入り切り、マーカーの色）はお使いの PC の中だけに保存されます。</li>
-      <li>そのため<strong>オフラインでは動作しません</strong>。ネットワークに接続してお使いください。</li>
+      <li>アドインの画面とプログラムは、GitHub Pages から読み込まれます。</li>
+      <li><strong>Word 文書の本文やコメントなどの内容が GitHub へ送信されることはありません。</strong></li>
+      <li>文書の解析と修正は、Word 内で実行されます。</li>
+      <li>設定（チェック項目の有効／無効、マーカーの色）はお使いの Mac の中だけに保存されます。</li>
+      <li>読み込みのため、<strong>オフラインでは動作しません</strong>。ネットワークに接続してお使いください。</li>
     </ul>
 
     <h2>不具合・要望</h2>
@@ -142,12 +141,5 @@
       <a href="https://github.com/t-shiokawa1/Document-Corrector/issues">GitHub の Issues</a> か、
       研究室内で直接お知らせください。誤検出の報告は、その箇所の文が分かると直しやすいです。
     </p>
-
-    <footer>
-      <p>
-        Document Corrector — 深澤研究室 /
-        <a href="https://github.com/t-shiokawa1/Document-Corrector">ソースコード</a>
-      </p>
-    </footer>
   </body>
 </html>

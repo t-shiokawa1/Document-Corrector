@@ -24,9 +24,6 @@
         </p>
         <div id="marker-colors"></div>
 
-        <h3>その他の色</h3>
-        <div id="other-colors"></div>
-
         <div class="row compact">
           <button id="color-reset" type="button">色を既定に戻す</button>
         </div>
@@ -56,7 +53,12 @@
     </div>
 
     <footer class="dialog-foot">
-      <span class="lead">設定はこのパソコンに保存されます。</span>
+      <span class="lead">
+        設定はこのパソコンに保存されます。<br />
+        <!-- 入っている版が最新かどうかは、更新の案内が出ていない限り分からない。
+             ここは常に出す（src/core/version.ts の versionLine）。 -->
+        <span id="version-line">確認しています…</span>
+      </span>
       <button id="settings-done" type="button" class="primary">閉じる</button>
     </footer>
   </body>

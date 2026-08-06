@@ -497,6 +497,32 @@
     "BuOK",
     "BuONa"
   ]);
+  var EN_DASH_PAIRS = Object.freeze([
+    ["HOMO", "LUMO"],
+    ["HOMO", "SOMO"],
+    ["SOMO", "LUMO"],
+    ["donor", "acceptor"],
+    ["structure", "property"],
+    ["structure", "activity"],
+    ["metal", "ligand"],
+    ["Diels", "Alder"],
+    ["Suzuki", "Miyaura"],
+    ["Sonogashira", "Hagihara"],
+    ["Buchwald", "Hartwig"],
+    ["Mizoroki", "Heck"],
+    ["Stille", "Migita"],
+    ["Friedel", "Crafts"],
+    ["Birch", "H\xFCckel"],
+    ["Marcus", "Hush"],
+    ["Jahn", "Teller"],
+    ["Beer", "Lambert"],
+    ["Stern", "Volmer"],
+    ["Franck", "Condon"],
+    ["Born", "Oppenheimer"],
+    ["Lennard", "Jones"],
+    ["Hartree", "Fock"],
+    ["Kohn", "Sham"]
+  ]);
 
   // src/core/types.ts
   var CATEGORIES = Object.freeze({
@@ -974,6 +1000,10 @@
   var GREEK = "\\u0370-\\u03FF\\u1F00-\\u1FFF";
   var CJK = "\\u3040-\\u30FF\\u3400-\\u4DBF\\u4E00-\\u9FFF";
   var GREEK_CJK_BOUNDARY = new RegExp(`([${GREEK}][${CJK}])|([${CJK}][${GREEK}])`, "gu");
+  var SYMBOL_CJK_BOUNDARY = new RegExp(
+    `((?<![A-Za-z0-9])[A-Za-z][${CJK}])|([${CJK}][A-Za-z](?![A-Za-z0-9]))`,
+    "gu"
+  );
   var greekSpacingRule = {
     id: "greek-cjk-space",
     category: "format",
@@ -995,7 +1025,21 @@
           })
         );
       }
-      return found;
+      for (const m of matchAll(SYMBOL_CJK_BOUNDARY, text)) {
+        const pair = m[0];
+        const replacement = `${pair[0]} ${pair[1]}`;
+        found.push(
+          finding(greekSpacingRule, {
+            severity: "confirm",
+            paragraphIndex: index,
+            start: m.index,
+            matched: pair,
+            replacement,
+            message: `\u30AE\u30EA\u30B7\u30E3\u6587\u5B57\u3068\u548C\u6587\u306E\u9593\u306B\u534A\u89D2\u30B9\u30DA\u30FC\u30B9\uFF1A\u300C${pair}\u300D\u2192\u300C${replacement}\u300D\uFF08\u6295\u7A3F\u898F\u7A0B\u3092\u78BA\u8A8D\uFF09`
+          })
+        );
+      }
+      return found.sort((a, b) => a.start - b.start);
     }
   };
   var JA_CHAR = /[\p{sc=Hiragana}\p{sc=Katakana}\p{sc=Han}]/u;
@@ -1055,8 +1099,40 @@
     while (end < text.length && DIGIT.test(text[end])) end += 1;
     return { start, end, text: text.slice(start, end) };
   }
+  var EN_DASH_PAIR = new RegExp(
+    `(?<![A-Za-z0-9-])(${EN_DASH_PAIRS.map(([a]) => escapeRegExp(a)).join("|")})-(${EN_DASH_PAIRS.map(
+      ([, b]) => escapeRegExp(b)
+    ).join("|")})(?![A-Za-z0-9-])`,
+    "giu"
+  );
+  var PAIR_KEYS = new Set(EN_DASH_PAIRS.map(([a, b]) => `${a}-${b}`.toLowerCase()));
+  var pairDashRule = {
+    id: "pair-dash",
+    category: "format",
+    title: "\u5BFE\u306B\u306A\u308B\u8A9E\u3092\u7D50\u3076\u6A2A\u68D2\u306F en dash",
+    kind: "paragraph",
+    run(text, index) {
+      const found = [];
+      for (const m of matchAll(EN_DASH_PAIR, text)) {
+        if (!PAIR_KEYS.has(`${m[1]}-${m[2]}`.toLowerCase())) continue;
+        const replacement = `${m[1]}\u2013${m[2]}`;
+        found.push(
+          finding(pairDashRule, {
+            severity: "fix",
+            paragraphIndex: index,
+            start: m.index,
+            matched: m[0],
+            replacement,
+            message: `\u5BFE\u306B\u306A\u308B\u8A9E\u3092\u7D50\u3076\u6A2A\u68D2\u306F en dash\uFF08\u2013\uFF09\uFF1A\u300C${m[0]}\u300D\u2192\u300C${replacement}\u300D`
+          })
+        );
+      }
+      return found;
+    }
+  };
   var FORMAT_RULES = [
     rangeDashRule,
+    pairDashRule,
     negativeDashRule,
     celsiusSignRule,
     compoundHyphenRule,
@@ -1134,6 +1210,10 @@
       summary: "\u2103\uFF08U+2103\uFF09\u3084 \u2109 \u306E\u3088\u3046\u306A 1 \u6587\u5B57\u306E\u5358\u4F4D\u8A18\u53F7\u3002\u300C\xB0\u300D\uFF0B\u300CC\u300D\u306E 2 \u6587\u5B57\u3067\u66F8\u304D\u307E\u3059\u3002Mac \u306E\u5EA6\u8A18\u53F7\u306F \u2325 + shift + 8 \u3067\u3059\u3002\u89D2\u5EA6\u306E 90\xB0 \u306F\u5BFE\u8C61\u5916\u3067\u3059\u3002",
       example: "-78\u2103 \u2192 -78 \xB0C"
     },
+    "pair-dash": {
+      summary: "\u5BFE\u7B49\u306A 2 \u3064\u306E\u3082\u306E\u3092\u7D50\u3076\u6A2A\u68D2\u3002\u30CF\u30A4\u30D5\u30F3\u3067\u306F\u306A\u304F en dash\uFF08\u2013\uFF09\u3092\u4F7F\u3044\u307E\u3059\u3002\u6587\u5B57\u306E\u4E26\u3073\u3060\u3051\u3067\u306F n-BuLi \u3084 well-known \u3068\u533A\u5225\u304C\u4ED8\u304B\u306A\u3044\u305F\u3081\u3001src/core/dict.ts \u306E EN_DASH_PAIRS \u306B\u8F09\u3063\u3066\u3044\u308B\u7D44\uFF08HOMO-LUMO\u3001Diels-Alder\u3001donor-acceptor \u306A\u3069\uFF09\u3060\u3051\u3092\u898B\u307E\u3059\u3002\u7814\u7A76\u5BA4\u3067\u4F7F\u3046\u7D44\u306F\u8FFD\u8A18\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
+      example: "HOMO-LUMO \u30AE\u30E3\u30C3\u30D7 \u2192 HOMO\u2013LUMO \u30AE\u30E3\u30C3\u30D7"
+    },
     "compound-hyphen": {
       summary: "\u5316\u5408\u7269\u540D\u306E\u4E2D\u306E\u6A2A\u68D2\u3002en dash \u3067\u306F\u306A\u304F\u30CF\u30A4\u30D5\u30F3\uFF08-\uFF09\u3092\u4F7F\u3044\u307E\u3059\u3002\u4E21\u5074\u304C\u5316\u5408\u7269\u540D\u3089\u3057\u3044\u3068\u304D\u3060\u3051\u898B\u308B\u306E\u3067\u3001HOMO\u2013LUMO \u3084 \u5316\u5408\u7269 a\u2013f \u306E\u3088\u3046\u306B en dash \u304C\u6B63\u3057\u3044\u7B87\u6240\u306F\u5BFE\u8C61\u5916\u3067\u3059\u3002",
       example: "2\u2013butanol \u2192 2-butanol\uFF0Fn\u2013BuLi \u2192 n-BuLi"
@@ -1155,9 +1235,10 @@
       example: "Figure 1\u306B\u793A\u3059 \u2192 Figure 1 \u306B\u793A\u3059"
     },
     "greek-cjk-space": {
-      summary: "\u30AE\u30EA\u30B7\u30E3\u6587\u5B57\u3068\u548C\u6587\u304C\u76F4\u63A5\u96A3\u308A\u5408\u3046\u7B87\u6240\u3002\u6295\u7A3F\u898F\u7A0B\u306B\u3088\u308A\u8981\u5426\u304C\u5206\u304B\u308C\u308B\u305F\u3081\u65E2\u5B9A\u3067\u306F\u7121\u52B9\u3067\u3059\u3002",
-      example: "\u03C0\u5171\u5F79 \u2192 \u03C0 \u5171\u5F79",
-      defaultEnabled: false
+      // 2026-07-29 に既定で有効へ。要否が投稿規程で分かれるのは変わらないが、
+      // 研究室の原稿では入れるほうが常だという利用者の判断。
+      summary: "\u30AE\u30EA\u30B7\u30E3\u6587\u5B57\u3068\u548C\u6587\u304C\u76F4\u63A5\u96A3\u308A\u5408\u3046\u7B87\u6240\u3002\u6295\u7A3F\u898F\u7A0B\u3067\u4E0D\u8981\u3068\u3055\u308C\u308B\u5834\u5408\u306F\u5916\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
+      example: "\u03C0\u5171\u5F79 \u2192 \u03C0 \u5171\u5F79"
     },
     "reagent-style": {
       summary: "\u8A66\u85AC\u306E\u7565\u8A18\u304C\u8907\u6570\u306E\u66F8\u304D\u65B9\u3067\u6DF7\u3056\u3063\u3066\u3044\u308B\u7B87\u6240\u3002\u6587\u66F8\u5185\u3067\u7D71\u4E00\u3057\u307E\u3059\u3002",
@@ -1209,8 +1290,8 @@
       example: "\u2026\u3092 Figure 1 \u306B\u793A\u3059\u3002\u306E\u300CFigure 1\u300D"
     },
     "compound-number-bold": {
-      summary: "\u5316\u5408\u7269\u756A\u53F7\u306F\u592A\u5B57\u306B\u3057\u307E\u3059\u3002\u6570\u5B57\u3060\u3051\u3067\u306F\u5224\u5225\u3067\u304D\u306A\u3044\u305F\u3081\u8A9E\u3092\u4F34\u3046\u5834\u5408\u306E\u307F\u898B\u307E\u3059\u3002",
-      example: "\u5316\u5408\u7269 1 \u306E\u300C1\u300D"
+      summary: "\u5316\u5408\u7269\u756A\u53F7\u306F\u592A\u5B57\u306B\u3057\u307E\u3059\u3002\u300C\u5316\u5408\u7269 1\u300D\u306E\u3088\u3046\u306B\u8A9E\u3092\u4F34\u3046\u3082\u306E\u306B\u52A0\u3048\u3066\u3001\u6587\u66F8\u5168\u4F53\u304B\u3089\u5316\u5408\u7269\u756A\u53F7\u3068\u5224\u65AD\u3067\u304D\u305F\u7CFB\u5217\u30E9\u30D9\u30EB\uFF081a\u30011a\u2013f \u306E 1a\u3001\u96FB\u8377\u4ED8\u304D\u306E 1b2\u2013 \u306E 1b\uFF09\u3082\u5BFE\u8C61\u3067\u3059\u3002\u88F8\u306E\u6570\u5B57\u306F\u5E74\u3084\u5DFB\u3068\u533A\u5225\u3067\u304D\u306A\u3044\u306E\u3067\u898B\u307E\u305B\u3093\u3002",
+      example: "\u5316\u5408\u7269 1 \u306E\u300C1\u300D\u30011a\u2013f \u306E\u300C1a\u300D"
     },
     // --- 2-(3) 参考文献 -------------------------------------------------------
     "citation-position": {
@@ -1232,6 +1313,18 @@
     "reference-journal-italic": {
       summary: "\u5F15\u7528\u6587\u732E\u306E\u8A8C\u540D\u306F\u659C\u4F53\u3002\u300C\u8A8C\u540D \u5E74, \u5DFB,\u300D\u306E\u4E26\u3073\u3060\u3051\u3092\u898B\u308B\u306E\u3067\u3001\u672C\u6587\u4E2D\u306E\u96D1\u8A8C\u540D\u306B\u306F\u53CD\u5FDC\u3057\u307E\u305B\u3093\u3002\u30A4\u30CB\u30B7\u30E3\u30EB \u59D3 \u306E\u9806\u3067\u8457\u8005\u3092\u66F8\u304D\u3001\u304B\u3064\u8A8C\u540D\u304C 1 \u6587\u5B57\u3067\u59CB\u307E\u308B\u5834\u5408\uFF08\u2026, H. Suzuki, J. Am. Chem. Soc. 2019\uFF09\u3060\u3051\u3001\u5148\u982D\u306E\u300CJ.\u300D\u3092\u8457\u8005\u306E\u30A4\u30CB\u30B7\u30E3\u30EB\u3068\u533A\u5225\u3067\u304D\u305A\u7BC4\u56F2\u304C\u77ED\u304F\u306A\u308A\u307E\u3059\u3002",
       example: "J. Am. Chem. Soc. 2019, 141, 1234. \u306E\u8A8C\u540D\u90E8\u5206"
+    },
+    "charge-superscript": {
+      summary: "\u9084\u5143\u7A2E\u30FB\u9178\u5316\u7A2E\u306E\u96FB\u8377\u304C\u4E0A\u4ED8\u304D\u306B\u306A\u3063\u3066\u3044\u306A\u3044\u7B87\u6240\uFF081b2\u2013 \u306E\u300C2\u2013\u300D\uFF09\u3002\u6587\u66F8\u304C\u5316\u5408\u7269\u756A\u53F7\u3068\u8A8D\u3081\u305F\u30E9\u30D9\u30EB\u306E\u76F4\u5F8C\u3060\u3051\u3092\u898B\u308B\u306E\u3067\u3001\u5F15\u304D\u7B97\u3084\u30DA\u30FC\u30B8\u7BC4\u56F2\u306B\u306F\u53CD\u5FDC\u3057\u307E\u305B\u3093\u3002",
+      example: "1b2\u2013 \u306E\u300C2\u2013\u300D\u3092\u4E0A\u4ED8\u304D\u306B"
+    },
+    "uncited-reference": {
+      summary: "\u6587\u732E\u30EA\u30B9\u30C8\u306B\u8F09\u3063\u3066\u3044\u308B\u306E\u306B\u3001\u672C\u6587\u306E\u3069\u3053\u304B\u3089\u3082\u5F15\u7528\u3055\u308C\u3066\u3044\u306A\u3044\u9805\u76EE\u3002\u5F15\u7528\u3092\u52A0\u3048\u308B\u304B\u3001\u30EA\u30B9\u30C8\u304B\u3089\u5916\u3057\u307E\u3059\u3002\u30EA\u30B9\u30C8\u81EA\u8EAB\u306E\u4E2D\u306E [1] \u306F\u5F15\u7528\u3068\u3057\u3066\u6570\u3048\u307E\u305B\u3093\u3002",
+      example: "[3] \u304C\u6587\u732E\u30EA\u30B9\u30C8\u306B\u3042\u308B\u304C\u3001\u672C\u6587\u306B [3] \u304C\u51FA\u3066\u3053\u306A\u3044"
+    },
+    "reference-year-bold": {
+      summary: "\u5F15\u7528\u6587\u732E\u306E\u5E74\u306F\u592A\u5B57\u3002ACS \u6D41\u3067\u306F \u8A8C\u540D\uFF08\u659C\u4F53\uFF09\u5E74\uFF08\u592A\u5B57\uFF09\u5DFB\uFF08\u659C\u4F53\uFF09\u306E\u9806\u3067\u3001\u5F37\u8ABF\u304C\u4E57\u308B\u306E\u306F\u5E74\u3067\u3059\u3002\u300C\u8A8C\u540D \u5E74, \u5DFB,\u300D\u306E\u4E26\u3073\u304B\u3089\u5E74\u3092\u7279\u5B9A\u3057\u307E\u3059\u3002\u3069\u3053\u3092\u5F37\u8ABF\u3059\u308B\u304B\u306F\u96D1\u8A8C\u306B\u3088\u308B\u305F\u3081\u3001\u78BA\u8A8D\u3068\u3057\u3066\u51FA\u3057\u307E\u3059\u3002",
+      example: "J. Am. Chem. Soc. 2019, 141, 1234. \u306E\u300C2019\u300D\u3092\u592A\u5B57\u306B"
     },
     "reference-volume-italic": {
       summary: "\u5F15\u7528\u6587\u732E\u306E\u5DFB\u306F\u659C\u4F53\u3002ACS \u6D41\u3067\u306F \u8A8C\u540D\uFF08\u659C\u4F53\uFF09\u5E74\uFF08\u592A\u5B57\uFF09\u5DFB\uFF08\u659C\u4F53\uFF09\u306E\u9806\u306A\u306E\u3067\u3001\u592A\u5B57\u306B\u3059\u308B\u306E\u306F\u5E74\u3067\u3001\u5DFB\u306F\u659C\u4F53\u3067\u3059\u3002\u540C\u3058\u304F\u300C\u8A8C\u540D \u5E74, \u5DFB,\u300D\u306E\u4E26\u3073\u304B\u3089\u5DFB\u3092\u7279\u5B9A\u3057\u307E\u3059\u3002\u3069\u3053\u3092\u5F37\u8ABF\u3059\u308B\u304B\u306F\u96D1\u8A8C\u306B\u3088\u308B\u305F\u3081\u3001\u78BA\u8A8D\u3068\u3057\u3066\u51FA\u3057\u307E\u3059\u3002",
@@ -1675,6 +1768,25 @@
     `(?<![A-Za-z0-9.])(\\d{1,4})([a-z])\\s*[\u2013\u2014\u2212-]\\s*(\\d{1,4})?([a-z])${LABEL_END}`,
     "gu"
   );
+  function labelRanges(text) {
+    const spans = [];
+    LABEL_RANGE.lastIndex = 0;
+    let m;
+    while ((m = LABEL_RANGE.exec(text)) !== null) {
+      spans.push({ start: m.index, text: m[0], base: `${m[1]}${m[2]}` });
+    }
+    return spans;
+  }
+  var FIGURE_LABEL = /(?:Fig(?:ures?|s?)?\.?|Tables?|Schemes?|Charts?|Eq(?:uations?|ns?)?\.?|Entry|Entries|Refs?\.?|図|表|式|スキーム|チャート)\s*$/iu;
+  var CONNECTOR = /^[\s,、and&+\-–—]*$/iu;
+  var FIGURE_LOOKBACK = 28;
+  function isFigureNumber(text, index) {
+    const before = text.slice(Math.max(0, index - FIGURE_LOOKBACK), index);
+    if (FIGURE_LABEL.test(before)) return true;
+    const viaConnector = /(\d+)([\s,、and&+\-–—]*)$/iu.exec(before);
+    if (!viaConnector || !CONNECTOR.test(viaConnector[2])) return false;
+    return FIGURE_LABEL.test(before.slice(0, before.length - viaConnector[0].length));
+  }
   var INTRODUCED = /(?:化合物|compounds?|compds?\.?)\s*$/iu;
   var LOOKBACK = 12;
   function letterSpan(from, to) {
@@ -2008,263 +2120,6 @@
     compoundOrderRule
   ];
 
-  // src/core/rules/reference.ts
-  var CITATION = /\[\s*\d+(?:\s*[,–\-]\s*\d+)*\s*\]/u;
-  var CITATION_SOURCE = CITATION.source;
-  var JA_CITATION_AFTER_PUNCT = new RegExp(`([\u3002\uFF0E])\\s*(${CITATION_SOURCE})`, "gu");
-  var EN_CITATION_BEFORE_PUNCT = new RegExp(`(${CITATION_SOURCE})\\s*([.,])`, "gu");
-  var citationPositionRule = {
-    id: "citation-position",
-    category: "reference",
-    title: "\u5F15\u7528\u756A\u53F7\u3068\u53E5\u8AAD\u70B9\u306E\u524D\u5F8C",
-    kind: "paragraph",
-    run(text, index) {
-      const found = [];
-      if (hasCJK(text)) {
-        for (const m of matchAll(JA_CITATION_AFTER_PUNCT, text)) {
-          const replacement = `${m[2]}${m[1]}`;
-          found.push(
-            finding(citationPositionRule, {
-              severity: "fix",
-              paragraphIndex: index,
-              start: m.index,
-              matched: m[0],
-              replacement,
-              message: `\u548C\u6587\u3067\u306F\u5F15\u7528\u756A\u53F7\u306F\u53E5\u8AAD\u70B9\u306E\u524D\uFF1A\u300C${m[0]}\u300D\u2192\u300C${replacement}\u300D`
-            })
-          );
-        }
-      } else {
-        for (const m of matchAll(EN_CITATION_BEFORE_PUNCT, text)) {
-          const replacement = `${m[2]}${m[1]}`;
-          found.push(
-            finding(citationPositionRule, {
-              severity: "fix",
-              paragraphIndex: index,
-              start: m.index,
-              matched: m[0],
-              replacement,
-              message: `\u82F1\u6587\u3067\u306F\u5F15\u7528\u756A\u53F7\u306F\u30D4\u30EA\u30AA\u30C9\u30FB\u30AB\u30F3\u30DE\u306E\u5F8C\uFF1A\u300C${m[0]}\u300D\u2192\u300C${replacement}\u300D`
-            })
-          );
-        }
-      }
-      return found;
-    }
-  };
-  var journalAbbrevRule = dictionaryRule({
-    id: "journal-abbrev",
-    category: "reference",
-    title: "\u96D1\u8A8C\u7565\u79F0",
-    entries: JOURNAL_ABBREV,
-    message: arrowMessage("\u96D1\u8A8C\u7565\u79F0")
-  });
-  var JOURNAL_LIKE = /\b(?:[A-Z][A-Za-z]*\.\s*){2,}(?:[A-Z][A-Za-z]*\.?)/gu;
-  var EDITION_SUFFIXES = /* @__PURE__ */ new Set(["engl"]);
-  function journalKey(name) {
-    const tokens = name.split(/\s+/u).filter((t) => t.length > 0);
-    while (tokens.length > 2 && EDITION_SUFFIXES.has(tokens[tokens.length - 1].replace(/\./gu, "").toLowerCase())) {
-      tokens.pop();
-    }
-    return tokens.join("").replace(/\./gu, "").toLowerCase();
-  }
-  var journalConsistencyRule = {
-    id: "journal-consistency",
-    category: "reference",
-    title: "\u96D1\u8A8C\u7565\u79F0\u306E\u63FA\u308C",
-    kind: "document",
-    run(paragraphs) {
-      const hits = [];
-      paragraphs.forEach((text, paragraphIndex) => {
-        for (const m of matchAll(JOURNAL_LIKE, text)) {
-          hits.push({ paragraphIndex, start: m.index, text: m[0].trim() });
-        }
-      });
-      const journals = /* @__PURE__ */ new Map();
-      for (const hit of hits) {
-        const key = journalKey(hit.text);
-        if (key.length === 0) continue;
-        if (!journals.has(key)) journals.set(key, /* @__PURE__ */ new Map());
-        const forms = journals.get(key);
-        if (!forms.has(hit.text)) forms.set(hit.text, []);
-        forms.get(hit.text).push(hit);
-      }
-      const found = [];
-      for (const forms of journals.values()) {
-        if (forms.size < 2) continue;
-        const sorted = [...forms.entries()].sort((a, b) => b[1].length - a[1].length);
-        const preferred = sorted[0][0];
-        for (const [form, occurrences2] of sorted.slice(1)) {
-          for (const hit of occurrences2) {
-            found.push(
-              finding(journalConsistencyRule, {
-                severity: "confirm",
-                paragraphIndex: hit.paragraphIndex,
-                start: hit.start,
-                matched: hit.text,
-                replacement: preferred,
-                message: `\u540C\u3058\u96D1\u8A8C\u304C 2 \u901A\u308A\u306B\u66F8\u304B\u308C\u3066\u3044\u307E\u3059\uFF1A\u300C${form}\u300D\u3068\u300C${preferred}\u300D\u3002\u63B2\u8F09\u5E74\u306B\u3088\u308B\u6539\u79F0\u3067\u306A\u3051\u308C\u3070\u7D71\u4E00\u3057\u3066\u304F\u3060\u3055\u3044\u3002`
-              })
-            );
-          }
-        }
-      }
-      return found;
-    }
-  };
-  var CITATION_STYLES = [
-    { name: "[1]", re: /\[\s*\d+(?:\s*[,–\-]\s*\d+)*\s*\]/gu },
-    { name: "(1)", re: /(?<![A-Za-z0-9])\(\s*\d+(?:\s*[,–\-]\s*\d+)*\s*\)(?![A-Za-z0-9])/gu }
-  ];
-  var citationStyleRule = {
-    id: "citation-style",
-    category: "reference",
-    title: "\u5F15\u7528\u30B9\u30BF\u30A4\u30EB\u306E\u7D71\u4E00",
-    kind: "document",
-    run(paragraphs) {
-      const counts = CITATION_STYLES.map(({ name, re }) => ({
-        name,
-        re,
-        total: paragraphs.reduce((n, p) => n + [...matchAll(re, p)].length, 0)
-      }));
-      const used = counts.filter((c) => c.total > 0);
-      if (used.length < 2) return [];
-      const sorted = [...used].sort((a, b) => b.total - a.total);
-      const preferred = sorted[0];
-      const found = [];
-      for (const style of sorted.slice(1)) {
-        paragraphs.forEach((text, paragraphIndex) => {
-          for (const m of matchAll(style.re, text)) {
-            found.push(
-              finding(citationStyleRule, {
-                severity: "confirm",
-                paragraphIndex,
-                start: m.index,
-                matched: m[0],
-                message: `\u5F15\u7528\u306E\u66F8\u5F0F\u304C\u6DF7\u5728\u3057\u3066\u3044\u307E\u3059\uFF08${preferred.name} \u304C ${preferred.total} \u4EF6\u3001${style.name} \u304C ${style.total} \u4EF6\uFF09\u3002`
-              })
-            );
-          }
-        });
-      }
-      return found;
-    }
-  };
-  var SURNAME_FIRST = /(?<![A-Z]\.\s)\b([A-Z][a-z]+),\s*([A-Z]\.(?:\s*[A-Z]\.)*)/gu;
-  var INITIALS_FIRST = /\b([A-Z]\.(?:\s*[A-Z]\.)*)\s+([A-Z][a-z]+)\b(?!\.)/gu;
-  var authorOrderRule = {
-    id: "author-order",
-    category: "reference",
-    title: "\u8457\u8005\u540D\u306E\u59D3\u540D\u9806\u306E\u7D71\u4E00",
-    kind: "document",
-    run(paragraphs) {
-      const surnameFirst = [];
-      const initialsFirst = [];
-      paragraphs.forEach((text, paragraphIndex) => {
-        for (const m of matchAll(SURNAME_FIRST, text)) {
-          surnameFirst.push({ paragraphIndex, start: m.index, text: m[0] });
-        }
-        for (const m of matchAll(INITIALS_FIRST, text)) {
-          initialsFirst.push({ paragraphIndex, start: m.index, text: m[0] });
-        }
-      });
-      if (surnameFirst.length === 0 || initialsFirst.length === 0) return [];
-      const minority = surnameFirst.length < initialsFirst.length ? surnameFirst : initialsFirst;
-      const minorityName = surnameFirst.length < initialsFirst.length ? "\u59D3, \u30A4\u30CB\u30B7\u30E3\u30EB" : "\u30A4\u30CB\u30B7\u30E3\u30EB \u59D3";
-      const majorityName = minorityName === "\u59D3, \u30A4\u30CB\u30B7\u30E3\u30EB" ? "\u30A4\u30CB\u30B7\u30E3\u30EB \u59D3" : "\u59D3, \u30A4\u30CB\u30B7\u30E3\u30EB";
-      return minority.map(
-        (hit) => finding(authorOrderRule, {
-          severity: "confirm",
-          paragraphIndex: hit.paragraphIndex,
-          start: hit.start,
-          matched: hit.text,
-          message: `\u8457\u8005\u540D\u306E\u59D3\u540D\u9806\u304C\u6DF7\u5728\u3057\u3066\u3044\u307E\u3059\uFF08\u591A\u6570\u6D3E\u306F\u300C${majorityName}\u300D\u3001\u3053\u3053\u306F\u300C${minorityName}\u300D\uFF09\u3002`
-        })
-      );
-    }
-  };
-  var REFERENCE_RULES = [
-    citationPositionRule,
-    journalAbbrevRule,
-    journalConsistencyRule,
-    citationStyleRule,
-    authorOrderRule
-  ];
-
-  // src/core/engine.ts
-  var ALL_RULES = Object.freeze([
-    ...FORMAT_RULES,
-    ...SCIENCE_RULES,
-    ...READABILITY_RULES,
-    ...FIGURE_RULES,
-    ...REFERENCE_RULES
-  ]);
-  function buildContext(paragraphs, settings, disabledEntries = /* @__PURE__ */ new Set()) {
-    const joined = paragraphs.join("\n");
-    const isJapanese = settings.documentLanguage === "auto" ? cjkRatio(joined) > 0.1 : settings.documentLanguage === "ja";
-    return { settings, isJapanese, disabledEntries, compoundLabels: compoundLabels(paragraphs) };
-  }
-  function review(paragraphs, options2 = {}) {
-    var _a, _b, _c, _d;
-    const settings = { ...DEFAULT_SETTINGS, ...options2.settings };
-    const ctx = buildContext(paragraphs, settings, new Set((_a = options2.disabledEntries) != null ? _a : []));
-    const ruleFilter = new Set((_b = options2.enabledRules) != null ? _b : []);
-    const categoryFilter = new Set((_c = options2.enabledCategories) != null ? _c : []);
-    const disabled = new Set((_d = options2.disabledRules) != null ? _d : []);
-    const rules = ALL_RULES.filter(
-      (rule) => !disabled.has(rule.id) && (ruleFilter.size === 0 || ruleFilter.has(rule.id)) && (categoryFilter.size === 0 || categoryFilter.has(rule.category))
-    );
-    const found = [];
-    for (const rule of rules) {
-      if (rule.kind === "document") {
-        found.push(...rule.run(paragraphs, ctx));
-      } else {
-        paragraphs.forEach((text, index) => found.push(...rule.run(text, index, ctx)));
-      }
-    }
-    return found.sort(
-      (a, b) => a.paragraphIndex - b.paragraphIndex || a.start - b.start || a.ruleId.localeCompare(b.ruleId)
-    );
-  }
-  function groupByCategory(findings) {
-    const groups = /* @__PURE__ */ new Map();
-    for (const item of findings) {
-      if (!groups.has(item.category)) groups.set(item.category, []);
-      groups.get(item.category).push(item);
-    }
-    return groups;
-  }
-  function groupByRule(findings) {
-    const groups = /* @__PURE__ */ new Map();
-    for (const item of findings) {
-      if (!groups.has(item.ruleId)) groups.set(item.ruleId, []);
-      groups.get(item.ruleId).push(item);
-    }
-    return groups;
-  }
-
-  // src/core/palette.ts
-  var HIGHLIGHT_PALETTE = Object.freeze([
-    { value: "#FFFF00", label: "\u9EC4" },
-    { value: "#FFE066", label: "\u3046\u3059\u3044\u9EC4" },
-    { value: "#FFD699", label: "\u30AF\u30EA\u30FC\u30E0" },
-    { value: "#B6FF00", label: "\u9EC4\u7DD1" },
-    { value: "#00FF00", label: "\u660E\u308B\u3044\u7DD1" },
-    { value: "#80FFFF", label: "\u6C34\u8272" },
-    { value: "#80DEEA", label: "\u30B7\u30A2\u30F3" },
-    { value: "#00FFFF", label: "\u30BF\u30FC\u30B3\u30A4\u30BA" },
-    { value: "#8080FF", label: "\u9752\u7D2B" },
-    { value: "#FF80FF", label: "\u30D4\u30F3\u30AF" },
-    { value: "#FF00FF", label: "\u30DE\u30BC\u30F3\u30BF" },
-    { value: "#FFA0A0", label: "\u30B5\u30FC\u30E2\u30F3" },
-    { value: "#C0C0C0", label: "\u30B0\u30EC\u30FC" }
-  ]);
-  function paletteColor(value) {
-    if (typeof value !== "string") return null;
-    const hex = value.toUpperCase();
-    return HIGHLIGHT_PALETTE.some((color) => color.value === hex) ? hex : null;
-  }
-
   // src/core/inventory.ts
   function bySeries(a, b) {
     const parse = (label) => {
@@ -2297,9 +2152,6 @@
     for (let code = start; code <= end; code += 1) letters.push(String.fromCharCode(code));
     return letters;
   }
-  var FIGURE_LABEL = /(?:Fig(?:ures?|s?)?\.?|Tables?|Schemes?|Charts?|Eq(?:uations?|ns?)?\.?|Entry|Entries|Refs?\.?|図|表|式|スキーム|チャート)\s*$/iu;
-  var CONNECTOR = /^[\s,、and&+\-–—]*$/iu;
-  var LABEL_LOOKBACK = 28;
   var YEAR = /^(?:19|20)\d{2}$/u;
   var UNIT_AHEAD = new RegExp(
     `^\\s*(?:${[...UNITS, "%"].sort((a, b) => b.length - a.length).map(escapeRegExp).join("|")})(?![A-Za-z0-9])`,
@@ -2317,13 +2169,7 @@
       if (YEAR.test(m[1]) && m[2] === void 0) continue;
       if (brackets.some((b) => m.index >= b.start && m.index < b.end)) continue;
       if (UNIT_AHEAD.test(text.slice(m.index + token.length))) continue;
-      const before = text.slice(Math.max(0, m.index - LABEL_LOOKBACK), m.index);
-      if (FIGURE_LABEL.test(before)) continue;
-      const viaConnector = /(\d+)([\s,、and&+\-–—]*)$/iu.exec(before);
-      if (viaConnector && CONNECTOR.test(viaConnector[2])) {
-        const upstream = before.slice(0, before.length - viaConnector[0].length);
-        if (FIGURE_LABEL.test(upstream)) continue;
-      }
+      if (isFigureNumber(text, m.index)) continue;
       candidates.push({ start: m.index, token });
     }
     return candidates;
@@ -2337,6 +2183,7 @@
       for (const m of matchAll(COMPOUND_RANGE, text)) {
         const [whole, stem, first, secondStem, last] = m;
         if (secondStem !== void 0 && secondStem !== stem) continue;
+        if (isFigureNumber(text, m.index)) continue;
         const letters = letterSpan2(first, last);
         if (letters.length === 0) continue;
         ranges.push({ start: m.index, end: m.index + whole.length });
@@ -2347,6 +2194,7 @@
       for (const m of matchAll(COMPOUND_LABEL2, text)) {
         if (!labels.has(m[0])) continue;
         if (insideRange(m.index)) continue;
+        if (isFigureNumber(text, m.index)) continue;
         claimed.add(m.index);
         mentions.push({
           label: m[0],
@@ -2360,7 +2208,7 @@
         claimed.add(digitsAt);
         mentions.push({
           label: m[1],
-          at: { paragraphIndex, start: m.index, text: m[0] },
+          at: { paragraphIndex, start: digitsAt, text: m[1] },
           evidence: "word"
         });
       }
@@ -2505,6 +2353,336 @@
     return hits;
   }
 
+  // src/core/rules/reference.ts
+  var CITATION = /\[\s*\d+(?:\s*[,–\-]\s*\d+)*\s*\]/u;
+  var CITATION_SOURCE = CITATION.source;
+  var JA_CITATION_AFTER_PUNCT = new RegExp(`([\u3002\uFF0E])\\s*(${CITATION_SOURCE})`, "gu");
+  var EN_CITATION_BEFORE_PUNCT = new RegExp(`(${CITATION_SOURCE})\\s*([.,])`, "gu");
+  var citationPositionRule = {
+    id: "citation-position",
+    category: "reference",
+    title: "\u5F15\u7528\u756A\u53F7\u3068\u53E5\u8AAD\u70B9\u306E\u524D\u5F8C",
+    kind: "paragraph",
+    run(text, index) {
+      const found = [];
+      if (hasCJK(text)) {
+        for (const m of matchAll(JA_CITATION_AFTER_PUNCT, text)) {
+          const replacement = `${m[2]}${m[1]}`;
+          found.push(
+            finding(citationPositionRule, {
+              severity: "fix",
+              paragraphIndex: index,
+              start: m.index,
+              matched: m[0],
+              replacement,
+              message: `\u548C\u6587\u3067\u306F\u5F15\u7528\u756A\u53F7\u306F\u53E5\u8AAD\u70B9\u306E\u524D\uFF1A\u300C${m[0]}\u300D\u2192\u300C${replacement}\u300D`
+            })
+          );
+        }
+      } else {
+        for (const m of matchAll(EN_CITATION_BEFORE_PUNCT, text)) {
+          const replacement = `${m[2]}${m[1]}`;
+          found.push(
+            finding(citationPositionRule, {
+              severity: "fix",
+              paragraphIndex: index,
+              start: m.index,
+              matched: m[0],
+              replacement,
+              message: `\u82F1\u6587\u3067\u306F\u5F15\u7528\u756A\u53F7\u306F\u30D4\u30EA\u30AA\u30C9\u30FB\u30AB\u30F3\u30DE\u306E\u5F8C\uFF1A\u300C${m[0]}\u300D\u2192\u300C${replacement}\u300D`
+            })
+          );
+        }
+      }
+      return found;
+    }
+  };
+  var journalAbbrevRule = dictionaryRule({
+    id: "journal-abbrev",
+    category: "reference",
+    title: "\u96D1\u8A8C\u7565\u79F0",
+    entries: JOURNAL_ABBREV,
+    message: arrowMessage("\u96D1\u8A8C\u7565\u79F0")
+  });
+  var JOURNAL_LIKE = /\b(?:[A-Z][A-Za-z]*\.\s*){2,}(?:[A-Z][A-Za-z]*\.?)/gu;
+  var EDITION_SUFFIXES = /* @__PURE__ */ new Set(["engl"]);
+  function journalKey(name) {
+    const tokens = name.split(/\s+/u).filter((t) => t.length > 0);
+    while (tokens.length > 2 && EDITION_SUFFIXES.has(tokens[tokens.length - 1].replace(/\./gu, "").toLowerCase())) {
+      tokens.pop();
+    }
+    return tokens.join("").replace(/\./gu, "").toLowerCase();
+  }
+  var journalConsistencyRule = {
+    id: "journal-consistency",
+    category: "reference",
+    title: "\u96D1\u8A8C\u7565\u79F0\u306E\u63FA\u308C",
+    kind: "document",
+    run(paragraphs) {
+      const hits = [];
+      paragraphs.forEach((text, paragraphIndex) => {
+        for (const m of matchAll(JOURNAL_LIKE, text)) {
+          hits.push({ paragraphIndex, start: m.index, text: m[0].trim() });
+        }
+      });
+      const journals = /* @__PURE__ */ new Map();
+      for (const hit of hits) {
+        const key = journalKey(hit.text);
+        if (key.length === 0) continue;
+        if (!journals.has(key)) journals.set(key, /* @__PURE__ */ new Map());
+        const forms = journals.get(key);
+        if (!forms.has(hit.text)) forms.set(hit.text, []);
+        forms.get(hit.text).push(hit);
+      }
+      const found = [];
+      for (const forms of journals.values()) {
+        if (forms.size < 2) continue;
+        const sorted = [...forms.entries()].sort((a, b) => b[1].length - a[1].length);
+        const preferred = sorted[0][0];
+        for (const [form, occurrences2] of sorted.slice(1)) {
+          for (const hit of occurrences2) {
+            found.push(
+              finding(journalConsistencyRule, {
+                severity: "confirm",
+                paragraphIndex: hit.paragraphIndex,
+                start: hit.start,
+                matched: hit.text,
+                replacement: preferred,
+                message: `\u540C\u3058\u96D1\u8A8C\u304C 2 \u901A\u308A\u306B\u66F8\u304B\u308C\u3066\u3044\u307E\u3059\uFF1A\u300C${form}\u300D\u3068\u300C${preferred}\u300D\u3002\u63B2\u8F09\u5E74\u306B\u3088\u308B\u6539\u79F0\u3067\u306A\u3051\u308C\u3070\u7D71\u4E00\u3057\u3066\u304F\u3060\u3055\u3044\u3002`
+              })
+            );
+          }
+        }
+      }
+      return found;
+    }
+  };
+  var CITATION_STYLES = [
+    { name: "[1]", re: /\[\s*\d+(?:\s*[,–\-]\s*\d+)*\s*\]/gu },
+    { name: "(1)", re: /(?<![A-Za-z0-9])\(\s*\d+(?:\s*[,–\-]\s*\d+)*\s*\)(?![A-Za-z0-9])/gu }
+  ];
+  var citationStyleRule = {
+    id: "citation-style",
+    category: "reference",
+    title: "\u5F15\u7528\u30B9\u30BF\u30A4\u30EB\u306E\u7D71\u4E00",
+    kind: "document",
+    run(paragraphs) {
+      const counts = CITATION_STYLES.map(({ name, re }) => ({
+        name,
+        re,
+        total: paragraphs.reduce((n, p) => n + [...matchAll(re, p)].length, 0)
+      }));
+      const used = counts.filter((c) => c.total > 0);
+      if (used.length < 2) return [];
+      const sorted = [...used].sort((a, b) => b.total - a.total);
+      const preferred = sorted[0];
+      const found = [];
+      for (const style of sorted.slice(1)) {
+        paragraphs.forEach((text, paragraphIndex) => {
+          for (const m of matchAll(style.re, text)) {
+            found.push(
+              finding(citationStyleRule, {
+                severity: "confirm",
+                paragraphIndex,
+                start: m.index,
+                matched: m[0],
+                message: `\u5F15\u7528\u306E\u66F8\u5F0F\u304C\u6DF7\u5728\u3057\u3066\u3044\u307E\u3059\uFF08${preferred.name} \u304C ${preferred.total} \u4EF6\u3001${style.name} \u304C ${style.total} \u4EF6\uFF09\u3002`
+              })
+            );
+          }
+        });
+      }
+      return found;
+    }
+  };
+  var SURNAME_FIRST = /\b([A-Z][a-z]+),\s*([A-Z]\.(?:\s*[A-Z]\.)*)/gu;
+  var INITIALS_FIRST = /\b([A-Z]\.(?:\s*[A-Z]\.)*)\s+([A-Z][a-z]+)\b(?!\.)/gu;
+  var AUTHOR_LOOKBACK = 40;
+  function initialsPrecede(text, index) {
+    const before = text.slice(Math.max(0, index - AUTHOR_LOOKBACK), index);
+    const separator = Math.max(before.lastIndexOf(","), before.lastIndexOf(";"));
+    return /[A-Z]\./u.test(before.slice(separator + 1));
+  }
+  var authorOrderRule = {
+    id: "author-order",
+    category: "reference",
+    title: "\u8457\u8005\u540D\u306E\u59D3\u540D\u9806\u306E\u7D71\u4E00",
+    kind: "document",
+    run(paragraphs) {
+      const surnameFirst = [];
+      const initialsFirst = [];
+      paragraphs.forEach((text, paragraphIndex) => {
+        for (const m of matchAll(SURNAME_FIRST, text)) {
+          if (initialsPrecede(text, m.index)) continue;
+          surnameFirst.push({ paragraphIndex, start: m.index, text: m[0] });
+        }
+        for (const m of matchAll(INITIALS_FIRST, text)) {
+          initialsFirst.push({ paragraphIndex, start: m.index, text: m[0] });
+        }
+      });
+      if (surnameFirst.length === 0 || initialsFirst.length === 0) return [];
+      const minority = surnameFirst.length < initialsFirst.length ? surnameFirst : initialsFirst;
+      const minorityName = surnameFirst.length < initialsFirst.length ? "\u59D3, \u30A4\u30CB\u30B7\u30E3\u30EB" : "\u30A4\u30CB\u30B7\u30E3\u30EB \u59D3";
+      const majorityName = minorityName === "\u59D3, \u30A4\u30CB\u30B7\u30E3\u30EB" ? "\u30A4\u30CB\u30B7\u30E3\u30EB \u59D3" : "\u59D3, \u30A4\u30CB\u30B7\u30E3\u30EB";
+      return minority.map(
+        (hit) => finding(authorOrderRule, {
+          severity: "confirm",
+          paragraphIndex: hit.paragraphIndex,
+          start: hit.start,
+          matched: hit.text,
+          message: `\u8457\u8005\u540D\u306E\u59D3\u540D\u9806\u304C\u6DF7\u5728\u3057\u3066\u3044\u307E\u3059\uFF08\u591A\u6570\u6D3E\u306F\u300C${majorityName}\u300D\u3001\u3053\u3053\u306F\u300C${minorityName}\u300D\uFF09\u3002`
+        })
+      );
+    }
+  };
+  var uncitedReferenceRule = {
+    id: "uncited-reference",
+    category: "reference",
+    title: "\u5F15\u7528\u3055\u308C\u3066\u3044\u306A\u3044\u6587\u732E",
+    kind: "document",
+    run(paragraphs) {
+      const entries = parseBibliography(paragraphs);
+      if (entries.length === 0) return [];
+      const inList = bibliographyParagraphs(entries);
+      const cited = /* @__PURE__ */ new Set();
+      for (const hit of bodyCitations(paragraphs, inList)) {
+        for (const number of citedNumbers(hit.text)) cited.add(number);
+      }
+      return entries.filter((entry) => !cited.has(entry.number)).map(
+        (entry) => finding(uncitedReferenceRule, {
+          severity: "note",
+          paragraphIndex: entry.paragraphIndex,
+          start: entry.start,
+          matched: entry.marker,
+          message: `\u6587\u732E ${entry.number} \u306F\u672C\u6587\u306E\u3069\u3053\u304B\u3089\u3082\u5F15\u7528\u3055\u308C\u3066\u3044\u307E\u305B\u3093\u3002\u5F15\u7528\u3092\u52A0\u3048\u308B\u304B\u3001\u30EA\u30B9\u30C8\u304B\u3089\u5916\u3057\u3066\u304F\u3060\u3055\u3044\u3002`
+        })
+      );
+    }
+  };
+  var REFERENCE_RULES = [
+    citationPositionRule,
+    journalAbbrevRule,
+    journalConsistencyRule,
+    citationStyleRule,
+    authorOrderRule,
+    uncitedReferenceRule
+  ];
+
+  // src/core/engine.ts
+  var ALL_RULES = Object.freeze([
+    ...FORMAT_RULES,
+    ...SCIENCE_RULES,
+    ...READABILITY_RULES,
+    ...FIGURE_RULES,
+    ...REFERENCE_RULES
+  ]);
+  function buildContext(paragraphs, settings2, disabledEntries = /* @__PURE__ */ new Set()) {
+    const joined = paragraphs.join("\n");
+    const isJapanese = settings2.documentLanguage === "auto" ? cjkRatio(joined) > 0.1 : settings2.documentLanguage === "ja";
+    return { settings: settings2, isJapanese, disabledEntries, compoundLabels: compoundLabels(paragraphs) };
+  }
+  function review(paragraphs, options2 = {}) {
+    var _a, _b, _c, _d;
+    const settings2 = { ...DEFAULT_SETTINGS, ...options2.settings };
+    const ctx = buildContext(paragraphs, settings2, new Set((_a = options2.disabledEntries) != null ? _a : []));
+    const ruleFilter = new Set((_b = options2.enabledRules) != null ? _b : []);
+    const categoryFilter = new Set((_c = options2.enabledCategories) != null ? _c : []);
+    const disabled = new Set((_d = options2.disabledRules) != null ? _d : []);
+    const rules = ALL_RULES.filter(
+      (rule) => !disabled.has(rule.id) && (ruleFilter.size === 0 || ruleFilter.has(rule.id)) && (categoryFilter.size === 0 || categoryFilter.has(rule.category))
+    );
+    const found = [];
+    for (const rule of rules) {
+      if (rule.kind === "document") {
+        found.push(...rule.run(paragraphs, ctx));
+      } else {
+        paragraphs.forEach((text, index) => found.push(...rule.run(text, index, ctx)));
+      }
+    }
+    return found.sort(
+      (a, b) => a.paragraphIndex - b.paragraphIndex || a.start - b.start || a.ruleId.localeCompare(b.ruleId)
+    );
+  }
+  function groupByCategory(findings) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const item of findings) {
+      if (!groups.has(item.category)) groups.set(item.category, []);
+      groups.get(item.category).push(item);
+    }
+    return groups;
+  }
+  function groupByRule(findings) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const item of findings) {
+      if (!groups.has(item.ruleId)) groups.set(item.ruleId, []);
+      groups.get(item.ruleId).push(item);
+    }
+    return groups;
+  }
+
+  // src/core/palette.ts
+  var HIGHLIGHT_PALETTE = Object.freeze([
+    { value: "#FFFF00", label: "\u9EC4" },
+    { value: "#FFE066", label: "\u3046\u3059\u3044\u9EC4" },
+    { value: "#FFD699", label: "\u30AF\u30EA\u30FC\u30E0" },
+    { value: "#B6FF00", label: "\u9EC4\u7DD1" },
+    { value: "#00FF00", label: "\u660E\u308B\u3044\u7DD1" },
+    { value: "#80FFFF", label: "\u6C34\u8272" },
+    { value: "#80DEEA", label: "\u30B7\u30A2\u30F3" },
+    { value: "#00FFFF", label: "\u30BF\u30FC\u30B3\u30A4\u30BA" },
+    { value: "#8080FF", label: "\u9752\u7D2B" },
+    { value: "#FF80FF", label: "\u30D4\u30F3\u30AF" },
+    { value: "#FF00FF", label: "\u30DE\u30BC\u30F3\u30BF" },
+    { value: "#FFA0A0", label: "\u30B5\u30FC\u30E2\u30F3" },
+    { value: "#C0C0C0", label: "\u30B0\u30EC\u30FC" }
+  ]);
+  function paletteColor(value) {
+    if (typeof value !== "string") return null;
+    const hex = value.toUpperCase();
+    return HIGHLIGHT_PALETTE.some((color) => color.value === hex) ? hex : null;
+  }
+
+  // src/core/figureInventory.ts
+  function kindFor(label) {
+    if (/^(?:Figure|Figures|Fig\.|Figs\.)$/u.test(label)) return "Figure";
+    if (/^(?:Table|Tables)$/u.test(label)) return "Table";
+    if (label === "\u56F3" || label === "\u8868") return label;
+    return null;
+  }
+  function itemLabel(kind, number) {
+    return kind === "\u56F3" || kind === "\u8868" ? `${kind}${number}` : `${kind} ${number}`;
+  }
+  function figureTableInventory(paragraphs) {
+    const items = /* @__PURE__ */ new Map();
+    const ensure = (kind, number) => {
+      const label = itemLabel(kind, number);
+      const existing = items.get(label);
+      if (existing) return existing;
+      const created = { kind, number, captions: [], references: [] };
+      items.set(label, created);
+      return created;
+    };
+    paragraphs.forEach((text, paragraphIndex) => {
+      const caption = parseCaption(text);
+      const captionKind = caption ? kindFor(caption.label) : null;
+      if (caption && captionKind) {
+        ensure(captionKind, caption.number).captions.push({
+          paragraphIndex,
+          start: caption.headStart,
+          text: caption.head
+        });
+      }
+      for (const reference of intextRefs(text)) {
+        const kind = kindFor(reference.label);
+        if (!kind || caption && reference.start < caption.headEnd) continue;
+        for (const number of reference.numbers) {
+          ensure(kind, number).references.push({ paragraphIndex, start: reference.start, text: reference.text });
+        }
+      }
+    });
+    return [...items.entries()].map(([label, item]) => ({ label, ...item })).sort((a, b) => a.kind.localeCompare(b.kind) || a.number - b.number);
+  }
+
   // src/office/locate.ts
   var MAX_SEARCH_LENGTH = 255;
   function escapeSearch(term) {
@@ -2592,8 +2770,6 @@
     "morisawa",
     "a-otf"
   ];
-  var SERIF_FONTS = ["times new roman", "times", "garamond", "georgia", "cambria", "minion", "serif"];
-  var SANS_FONTS = ["helvetica", "arial", "calibri", "segoe ui", "verdana", "tahoma", "futura"];
   function normalize(name) {
     if (!name) return "";
     return name.split(",")[0].trim().toLowerCase();
@@ -2603,38 +2779,12 @@
     if (family.length === 0) return false;
     return JAPANESE_FONTS.some((jp) => family.includes(jp));
   }
-  function isSerifLatinFont(name) {
-    const family = normalize(name);
-    return SERIF_FONTS.some((f) => family.includes(f));
-  }
-  function isSansLatinFont(name) {
-    const family = normalize(name);
-    return SANS_FONTS.some((f) => family.includes(f));
-  }
   function japaneseFontStyle(name) {
     const family = normalize(name);
     if (!isJapaneseFontName(family)) return "unknown";
     if (/(mincho|明朝|serif|minion|kozuka mincho|小塚明朝)/u.test(family)) return "mincho";
     if (/(gothic|ゴシック|sans|meiryo|メイリオ|hiragino sans|kaku)/u.test(family)) return "gothic";
     return "unknown";
-  }
-  function latinFontMismatch(japaneseFont, latinFont) {
-    const style = japaneseFontStyle(japaneseFont);
-    if (style === "unknown") return null;
-    if (!latinFont || normalize(latinFont).length === 0) return null;
-    if (isJapaneseFontName(latinFont)) {
-      return {
-        expected: style === "mincho" ? "Times New Roman" : "Helvetica / Arial",
-        reason: "\u82F1\u6570\u5B57\u306B\u65E5\u672C\u8A9E\u30D5\u30A9\u30F3\u30C8\u304C\u5F53\u305F\u3063\u3066\u3044\u307E\u3059"
-      };
-    }
-    if (style === "gothic" && !isSansLatinFont(latinFont)) {
-      return { expected: "Helvetica / Arial", reason: "\u548C\u6587\u304C\u30B4\u30B7\u30C3\u30AF\u7CFB\u306A\u306E\u3067\u82F1\u6587\u306F\u30B5\u30F3\u30BB\u30EA\u30D5" };
-    }
-    if (style === "mincho" && !isSerifLatinFont(latinFont)) {
-      return { expected: "Times New Roman", reason: "\u548C\u6587\u304C\u660E\u671D\u7CFB\u306A\u306E\u3067\u82F1\u6587\u306F\u30BB\u30EA\u30D5" };
-    }
-    return null;
   }
   function preferredLatinFont(japaneseFont) {
     return japaneseFontStyle(japaneseFont) === "gothic" ? "Arial" : "Times New Roman";
@@ -2709,9 +2859,18 @@
   }
 
   // src/office/fontScan.ts
+  var CHARACTER_STYLES = Object.freeze([
+    { style: "bold", label: "\u592A\u5B57" },
+    { style: "italic", label: "\u659C\u4F53" },
+    { style: "superscript", label: "\u4E0A\u4ED8\u304D" },
+    { style: "subscript", label: "\u4E0B\u4ED8\u304D" }
+  ]);
   var WORD_DELIMITERS = [" "];
+  var LATIN_RUN2 = "[A-Za-z0-9]{1,}";
+  var CJK_RUN = "[\u3041-\u3093\u30A1-\u30F6\u4E00-\u9FA5]{1,}";
+  var WILDCARD = { matchWildcards: true };
   async function fontUnits(context, paragraphs) {
-    var _a, _b;
+    var _a, _b, _c;
     for (const paragraph of paragraphs) {
       paragraph.load("text");
       paragraph.font.load("name");
@@ -2733,14 +2892,59 @@
     }
     if (splits.length === 0) return units;
     await context.sync();
+    const pieces = [];
     for (const split of splits) {
       for (const range of split.ranges.items) {
         range.font.load("name");
-        units.push({ font: range.font, text: (_b = range.text) != null ? _b : split.text });
+        pieces.push({ range, text: (_b = range.text) != null ? _b : split.text });
       }
     }
-    if (splits.length > 0) await context.sync();
+    await context.sync();
+    const runs = [];
+    for (const piece of pieces) {
+      if (piece.range.font.name) {
+        units.push({ font: piece.range.font, text: piece.text });
+        continue;
+      }
+      if (typeof piece.range.search !== "function") continue;
+      for (const pattern of [LATIN_RUN2, CJK_RUN]) {
+        const results = piece.range.search(pattern, WILDCARD);
+        results.load("items/text");
+        runs.push(results);
+      }
+    }
+    if (runs.length === 0) return units;
+    await context.sync();
+    for (const results of runs) {
+      for (const range of results.items) {
+        range.font.load("name");
+        units.push({ font: range.font, text: (_c = range.text) != null ? _c : "" });
+      }
+    }
+    await context.sync();
     return units;
+  }
+  async function styleUnits(context, paragraphs) {
+    var _a;
+    const collections = [];
+    for (const paragraph of paragraphs) {
+      const ranges = paragraph.search("?", WILDCARD);
+      ranges.load("items/text");
+      collections.push(ranges);
+    }
+    await context.sync();
+    const units = [];
+    for (const ranges of collections) {
+      for (const range of ranges.items) {
+        range.font.load("bold, italic, superscript, subscript");
+        units.push({ font: range.font, text: (_a = range.text) != null ? _a : "" });
+      }
+    }
+    await context.sync();
+    return units;
+  }
+  function hasStyle(font, style) {
+    return font[style] === true;
   }
   async function scanFonts(context, paragraphs) {
     const units = await fontUnits(context, paragraphs);
@@ -2748,14 +2952,48 @@
     for (const unit of units) {
       const name = unit.font.name;
       if (!name) continue;
+      const characters = unit.text.replace(/\s/gu, "").length;
       const existing = counts.get(name);
       if (existing) {
         existing.ranges += 1;
+        existing.characters += characters;
         continue;
       }
-      counts.set(name, { ranges: 1, sample: unit.text.trim().slice(0, 24) });
+      counts.set(name, { ranges: 1, characters, sample: unit.text.trim().slice(0, 24) });
     }
     return [...counts.entries()].map(([name, info]) => ({ name, ...info, japanese: isJapaneseFontName(name) })).sort((a, b) => b.ranges - a.ranges || a.name.localeCompare(b.name));
+  }
+  async function scanCharacterStyles(context, paragraphs) {
+    const units = await styleUnits(context, paragraphs);
+    return CHARACTER_STYLES.map(({ style, label }) => ({
+      style,
+      label,
+      characters: units.filter((unit) => hasStyle(unit.font, style)).length
+    })).filter((usage) => usage.characters > 0);
+  }
+  async function replaceCharacterStyle(context, paragraphs, from, to) {
+    if (from === to) return 0;
+    const units = await styleUnits(context, paragraphs);
+    let changed = 0;
+    for (const unit of units) {
+      if (!hasStyle(unit.font, from)) continue;
+      unit.font[from] = false;
+      if (to !== "normal") unit.font[to] = true;
+      changed += 1;
+    }
+    if (changed > 0) await context.sync();
+    return changed;
+  }
+  async function highlightCharacterStyle(context, paragraphs, style, color) {
+    const units = await styleUnits(context, paragraphs);
+    let highlighted = 0;
+    for (const unit of units) {
+      if (!hasStyle(unit.font, style)) continue;
+      unit.font.highlightColor = color;
+      highlighted += 1;
+    }
+    if (highlighted > 0) await context.sync();
+    return highlighted;
   }
   async function replaceFont(context, paragraphs, from, to) {
     if (from === to || from.length === 0 || to.length === 0) return 0;
@@ -2768,6 +3006,91 @@
     }
     if (changed > 0) await context.sync();
     return changed;
+  }
+  async function highlightFont(context, paragraphs, name, color) {
+    if (name.length === 0) return 0;
+    const units = await fontUnits(context, paragraphs);
+    let highlighted = 0;
+    for (const unit of units) {
+      if (unit.font.name !== name) continue;
+      unit.font.highlightColor = color;
+      highlighted += 1;
+    }
+    if (highlighted > 0) await context.sync();
+    return highlighted;
+  }
+  async function clearFontHighlights(context, paragraphs, highlights) {
+    var _a;
+    if (highlights.size === 0) return 0;
+    const units = await fontUnits(context, paragraphs);
+    const targets = units.filter((unit) => {
+      var _a2;
+      return highlights.has((_a2 = unit.font.name) != null ? _a2 : "");
+    });
+    for (const unit of targets) unit.font.load("highlightColor");
+    if (targets.length > 0) await context.sync();
+    const normal = (value) => typeof value === "string" ? value.replace(/^#/u, "").toUpperCase() : "";
+    const aliases = {
+      "FFFF00": ["YELLOW"],
+      "B6FF00": ["BRIGHTGREEN"],
+      "00FF00": ["GREEN"],
+      "80FFFF": ["CYAN", "TURQUOISE"],
+      "80DEEA": ["CYAN", "TURQUOISE"],
+      "00FFFF": ["CYAN", "TURQUOISE"],
+      "8080FF": ["BLUE"],
+      "FF80FF": ["PINK"],
+      "FF00FF": ["MAGENTA"],
+      "FFA0A0": ["RED"],
+      "C0C0C0": ["GRAY"]
+    };
+    let cleared = 0;
+    for (const unit of targets) {
+      const colors = highlights.get((_a = unit.font.name) != null ? _a : "");
+      const accepted = new Set([...colors].flatMap((color) => {
+        var _a2;
+        return [normal(color), ...(_a2 = aliases[normal(color)]) != null ? _a2 : []];
+      }));
+      if (!accepted.has(normal(unit.font.highlightColor))) continue;
+      unit.font.highlightColor = null;
+      cleared += 1;
+    }
+    if (cleared > 0) await context.sync();
+    return cleared;
+  }
+  async function clearCharacterStyleHighlights(context, paragraphs, highlights) {
+    if (highlights.size === 0) return 0;
+    const units = (await styleUnits(context, paragraphs)).filter(
+      (unit) => [...highlights.keys()].some((style) => hasStyle(unit.font, style))
+    );
+    for (const unit of units) unit.font.load("highlightColor");
+    if (units.length > 0) await context.sync();
+    const normal = (value) => typeof value === "string" ? value.replace(/^#/u, "").toUpperCase() : "";
+    const aliases = {
+      "FFFF00": ["YELLOW"],
+      "B6FF00": ["BRIGHTGREEN"],
+      "00FF00": ["GREEN"],
+      "80FFFF": ["CYAN", "TURQUOISE"],
+      "80DEEA": ["CYAN", "TURQUOISE"],
+      "00FFFF": ["CYAN", "TURQUOISE"],
+      "8080FF": ["BLUE"],
+      "FF80FF": ["PINK"],
+      "FF00FF": ["MAGENTA"],
+      "FFA0A0": ["RED"],
+      "C0C0C0": ["GRAY"]
+    };
+    let cleared = 0;
+    for (const unit of units) {
+      const colors = [...highlights.entries()].filter(([style]) => hasStyle(unit.font, style)).flatMap(([, values]) => [...values]);
+      const accepted = new Set(colors.flatMap((color) => {
+        var _a;
+        return [normal(color), ...(_a = aliases[normal(color)]) != null ? _a : []];
+      }));
+      if (!accepted.has(normal(unit.font.highlightColor))) continue;
+      unit.font.highlightColor = null;
+      cleared += 1;
+    }
+    if (cleared > 0) await context.sync();
+    return cleared;
   }
 
   // src/core/probes.ts
@@ -2864,12 +3187,44 @@
     );
   }
   function journalNameProbes(text) {
-    return referenceEntries(text).map((m) => ({
-      start: m.index,
-      end: m.index + m[1].length,
-      text: m[1],
-      reason: `\u5F15\u7528\u6587\u732E\u306E\u8A8C\u540D\u300C${m[1]}\u300D\u306F\u659C\u4F53\u306B\u3057\u307E\u3059`
-    }));
+    return referenceEntries(text).map((m) => {
+      const name = m[1].replace(/\.$/u, "");
+      return {
+        start: m.index,
+        end: m.index + name.length,
+        text: name,
+        reason: `\u5F15\u7528\u6587\u732E\u306E\u8A8C\u540D\u300C${m[1]}\u300D\u306F\u659C\u4F53\u306B\u3057\u307E\u3059`
+      };
+    });
+  }
+  function chargeProbes(text, labels) {
+    const probes = [];
+    for (const label of labels) {
+      const pattern = new RegExp(`(?<![A-Za-z0-9.])${label}(\\d{1,2}\\s*[\u2013\u2014\u2212+])`, "gu");
+      for (const m of matchAll(pattern, text)) {
+        const charge = m[1];
+        const start = m.index + label.length;
+        probes.push({
+          start,
+          end: start + charge.length,
+          text: charge,
+          reason: `\u5316\u5408\u7269 ${label} \u306E\u96FB\u8377\u300C${charge.trim()}\u300D\u306F\u4E0A\u4ED8\u304D\u306B\u3057\u307E\u3059`
+        });
+      }
+    }
+    return probes.sort((a, b) => a.start - b.start);
+  }
+  function yearProbes(text) {
+    return referenceEntries(text).map((m) => {
+      const year = m[2];
+      const start = m.index + m[0].indexOf(year, m[1].length);
+      return {
+        start,
+        end: start + year.length,
+        text: year,
+        reason: `\u5F15\u7528\u6587\u732E\u306E\u5E74\u300C${year}\u300D\u306F\u592A\u5B57\u306B\u3057\u307E\u3059`
+      };
+    });
   }
   function volumeNumberProbes(text) {
     return referenceEntries(text).map((m) => {
@@ -2884,19 +3239,45 @@
     });
   }
   var COMPOUND_NUMBER = /(?:compounds?|化合物)\s*(\d+[a-z]?)/giu;
-  function compoundNumberProbes(text) {
-    const probes = [];
+  function compoundNumberProbes(text, labels = /* @__PURE__ */ new Set()) {
+    const probes = /* @__PURE__ */ new Map();
     for (const m of matchAll(COMPOUND_NUMBER, text)) {
       const digits = m[1];
       const start = m.index + m[0].lastIndexOf(digits);
-      probes.push({
+      probes.set(start, {
         start,
         end: start + digits.length,
         text: digits,
         reason: `\u5316\u5408\u7269\u756A\u53F7\u300C${digits}\u300D\u306F\u592A\u5B57\u306B\u3057\u307E\u3059`
       });
     }
-    return probes;
+    const covered = [];
+    for (const span of labelRanges(text)) {
+      if (!labels.has(span.base)) continue;
+      if (isFigureNumber(text, span.start)) continue;
+      covered.push({ start: span.start, end: span.start + span.text.length });
+      probes.set(span.start, {
+        start: span.start,
+        end: span.start + span.text.length,
+        text: span.text,
+        reason: `\u5316\u5408\u7269\u756A\u53F7\u300C${span.text}\u300D\u306F\u592A\u5B57\u306B\u3057\u307E\u3059`
+      });
+    }
+    const inRange = (start) => covered.some((span) => start >= span.start && start < span.end);
+    for (const label of labels) {
+      const pattern = new RegExp(`(?<![A-Za-z0-9.])${label}${LABEL_END}`, "gu");
+      for (const m of matchAll(pattern, text)) {
+        if (probes.has(m.index) || inRange(m.index)) continue;
+        if (isFigureNumber(text, m.index)) continue;
+        probes.set(m.index, {
+          start: m.index,
+          end: m.index + label.length,
+          text: label,
+          reason: `\u5316\u5408\u7269\u756A\u53F7\u300C${label}\u300D\u306F\u592A\u5B57\u306B\u3057\u307E\u3059`
+        });
+      }
+    }
+    return [...probes.values()].sort((a, b) => a.start - b.start);
   }
 
   // src/office/formatChecks.ts
@@ -2988,11 +3369,26 @@
       category: "figure",
       title: "\u5316\u5408\u7269\u756A\u53F7\u306F\u592A\u5B57",
       probe: compoundNumberProbes,
-      load: "bold",
+      // 上付きも読むのは、それが化合物番号かどうかの判定に要るから。
+      // 「ジラジカル化合物⁸⁸と」 の 88 は文献 88 で、本文だけ見ると
+      // 「化合物 88」 と区別が付かない。数字が上がっていることだけが証拠になる。
+      load: "bold, superscript",
       severity: "confirm",
-      verdict: (font, probe) => font.bold ? null : probe.reason,
+      verdict: (font, probe) => font.superscript || font.bold ? null : probe.reason,
       fix: (font) => {
         font.bold = true;
+      }
+    },
+    {
+      id: "charge-superscript",
+      category: "figure",
+      title: "\u5316\u5408\u7269\u306E\u96FB\u8377\u306F\u4E0A\u4ED8\u304D",
+      probe: chargeProbes,
+      load: "superscript",
+      severity: "fix",
+      verdict: (font, probe) => font.superscript ? null : probe.reason,
+      fix: (font) => {
+        font.superscript = true;
       }
     },
     {
@@ -3007,6 +3403,19 @@
       verdict: (font, probe) => font.italic ? null : probe.reason,
       fix: (font) => {
         font.italic = true;
+      }
+    },
+    {
+      id: "reference-year-bold",
+      category: "reference",
+      title: "\u5F15\u7528\u6587\u732E\u306E\u5E74\u306F\u592A\u5B57",
+      probe: yearProbes,
+      load: "bold",
+      // 誌名の書式と同じく、どの語を強調するかは投稿規程で決まるので確認扱い。
+      severity: "confirm",
+      verdict: (font, probe) => font.bold ? null : probe.reason,
+      fix: (font) => {
+        font.bold = true;
       }
     },
     {
@@ -3103,7 +3512,7 @@
     }
     return findings;
   }
-  async function runFormatChecks(context, paragraphs, paragraphTexts, disabled = /* @__PURE__ */ new Set()) {
+  async function runFormatChecks(context, paragraphs, paragraphTexts, disabled = /* @__PURE__ */ new Set(), labels = /* @__PURE__ */ new Set()) {
     var _a, _b;
     const pending = [];
     const checks = activeChecks(disabled);
@@ -3111,7 +3520,7 @@
       const paragraph = paragraphs[paragraphIndex];
       if (!paragraph) return;
       for (const check of checks) {
-        for (const probe of check.probe(text)) {
+        for (const probe of check.probe(text, labels)) {
           const term = searchTermFor(probe.text);
           if (term.length === 0) continue;
           const ordinal = occurrenceIndex(text, probe.text, probe.start);
@@ -3186,41 +3595,43 @@
     }
     return findings.filter((item) => !citations.has(item));
   }
-  async function buildFontInventory(context, paragraphs, paragraphTexts) {
-    for (const paragraph of paragraphs) paragraph.font.load("name");
+  function loneLetterOf(item) {
+    const match = /[A-Za-z]/u.exec(item.matched);
+    return match === null ? null : { text: match[0], start: item.start + match.index };
+  }
+  async function dropNonSymbolLetters(context, paragraphs, paragraphTexts, findings) {
+    const pending = [];
+    for (const item of findings) {
+      if (item.ruleId !== greekSpacingRule.id) continue;
+      const letter = loneLetterOf(item);
+      if (!letter) continue;
+      const text = paragraphTexts[item.paragraphIndex];
+      const paragraph = paragraphs[item.paragraphIndex];
+      if (text === void 0 || !paragraph) continue;
+      const term = searchTermFor(letter.text);
+      if (term.length === 0) continue;
+      const ordinal = occurrenceIndex(text, letter.text, letter.start);
+      if (ordinal < 0) continue;
+      const results = paragraph.search(term, EXACT);
+      results.load("items");
+      pending.push({ finding: item, ordinal, results });
+    }
+    if (pending.length === 0) return [...findings];
     await context.sync();
-    const counts = /* @__PURE__ */ new Map();
-    paragraphs.forEach((paragraph, i) => {
-      var _a;
-      const name = paragraph.font.name;
-      if (!name) return;
-      const existing = counts.get(name);
-      if (existing) {
-        existing.paragraphs += 1;
-      } else {
-        counts.set(name, { paragraphs: 1, sample: ((_a = paragraphTexts[i]) != null ? _a : "").slice(0, 24) });
-      }
-    });
-    const entries = [...counts.entries()].map(([font, info]) => ({ font, ...info })).sort((a, b) => b.paragraphs - a.paragraphs);
-    const japanese = entries.filter((e) => isJapaneseFontName(e.font));
-    const latin = entries.filter((e) => !isJapaneseFontName(e.font));
-    const mismatches = [];
-    for (const jp of japanese) {
-      for (const en of latin) {
-        const problem = latinFontMismatch(jp.font, en.font);
-        if (!problem) continue;
-        mismatches.push(
-          `\u548C\u6587\u300C${jp.font}\u300D\u3068\u6B27\u6587\u300C${en.font}\u300D\u306E\u7D44\u307F\u5408\u308F\u305B\uFF1A${problem.reason}\u3002\u671F\u5F85\u3055\u308C\u308B\u306E\u306F ${problem.expected}\u3002`
-        );
-      }
+    const resolved = [];
+    for (const item of pending) {
+      const range = item.results.items[item.ordinal];
+      if (!range) continue;
+      range.font.load("name");
+      resolved.push({ finding: item.finding, range });
     }
-    if (japanese.length > 1) {
-      mismatches.push(`\u548C\u6587\u30D5\u30A9\u30F3\u30C8\u304C ${japanese.length} \u7A2E\u985E\u4F7F\u308F\u308C\u3066\u3044\u307E\u3059\uFF1A${japanese.map((e) => e.font).join("\u3001")}`);
+    if (resolved.length === 0) return [...findings];
+    await context.sync();
+    const latin = /* @__PURE__ */ new Set();
+    for (const { finding: item, range } of resolved) {
+      if (range.font.name !== SYMBOL_FONT) latin.add(item);
     }
-    if (latin.length > 1) {
-      mismatches.push(`\u6B27\u6587\u30D5\u30A9\u30F3\u30C8\u304C ${latin.length} \u7A2E\u985E\u4F7F\u308F\u308C\u3066\u3044\u307E\u3059\uFF1A${latin.map((e) => e.font).join("\u3001")}`);
-    }
-    return { entries, mismatches };
+    return findings.filter((item) => !latin.has(item));
   }
 
   // src/office/ruleCatalog.ts
@@ -3265,11 +3676,13 @@
   }
   async function highlightAllSpaces(opts) {
     return Word.run(async (context) => {
-      var _a;
+      var _a, _b;
       const scope = scopeOf(context, opts.selectionOnly);
-      const color = (_a = opts.spaceColor) != null ? _a : SPACING_HIGHLIGHT;
       let highlighted = 0;
-      for (const space of [" ", "\u3000"]) {
+      for (const [space, color] of [
+        [" ", (_a = opts.halfSpaceColor) != null ? _a : SPACING_HIGHLIGHT],
+        ["\u3000", (_b = opts.fullSpaceColor) != null ? _b : SPACING_HIGHLIGHT]
+      ]) {
         const results = scope.search(space, { matchCase: true, matchWildcards: false });
         results.load("items");
         await context.sync();
@@ -3356,23 +3769,30 @@
     const paragraphs = collection.items;
     return { paragraphs, texts: paragraphs.map((p) => p.text) };
   }
-  async function reviewDocument(opts) {
+  var REVIEW_STEPS = 4;
+  async function reviewDocument(opts, onProgress = () => {
+  }) {
     return Word.run(async (context) => {
       var _a, _b;
+      onProgress({ step: 1, of: REVIEW_STEPS, what: "\u672C\u6587\u3092\u8AAD\u307F\u8FBC\u3093\u3067\u3044\u307E\u3059" });
       const { paragraphs, texts } = await loadParagraphs(context, opts.selectionOnly);
+      onProgress({ step: 2, of: REVIEW_STEPS, what: `${texts.length} \u6BB5\u843D\u306E\u6587\u7AE0\u3092\u70B9\u691C\u3057\u3066\u3044\u307E\u3059` });
       const disabled = new Set((_a = opts.disabledRules) != null ? _a : []);
       const rawTextFindings = review(texts, {
         ...(_b = opts.reviewOptions) != null ? _b : {},
         disabledRules: [...disabled]
       });
-      const textFindings = await dropSuperscriptCitations(context, paragraphs, texts, rawTextFindings);
-      const formatFindings = await runFormatChecks(context, paragraphs, texts, disabled);
+      onProgress({ step: 3, of: REVIEW_STEPS, what: "\u4E0A\u4ED8\u304D\u6587\u5B57\u3068\u30D5\u30A9\u30F3\u30C8\u3092\u78BA\u304B\u3081\u3066\u3044\u307E\u3059" });
+      const withoutCitations = await dropSuperscriptCitations(context, paragraphs, texts, rawTextFindings);
+      const textFindings = await dropNonSymbolLetters(context, paragraphs, texts, withoutCitations);
+      onProgress({ step: 4, of: REVIEW_STEPS, what: "\u592A\u5B57\u30FB\u659C\u4F53\u30FB\u4E0A\u4ED8\u304D\u3092\u78BA\u304B\u3081\u3066\u3044\u307E\u3059" });
+      const labels = compoundLabels(texts);
+      const formatFindings = await runFormatChecks(context, paragraphs, texts, disabled, labels);
       const paragraphFindings = await runParagraphChecks(context, paragraphs, texts, disabled);
-      const fontInventory = await buildFontInventory(context, paragraphs, texts);
       const findings = [...textFindings, ...formatFindings, ...paragraphFindings].sort(
         (a, b) => a.paragraphIndex - b.paragraphIndex || a.start - b.start || a.ruleId.localeCompare(b.ruleId)
       );
-      return { findings, fontInventory, paragraphCount: texts.length };
+      return { findings, paragraphCount: texts.length };
     });
   }
   async function highlightFindings(findings, opts) {
@@ -3401,14 +3821,12 @@
       return located.length;
     });
   }
+  var TOOL_COMMENT_MARKER = "\u2063\u2063\u2063\u2063\u2063\u2063\u2063\u2063";
   function commentText(finding2) {
-    return `\u3010${titleFor(finding2.ruleId)}\u3011${finding2.message}`;
+    return `${TOOL_COMMENT_MARKER}\u3010${titleFor(finding2.ruleId)}\u3011${finding2.message}`;
   }
-  var COMMENT_TITLES = new Set(RULE_CATALOG.map((item) => item.title));
   function isToolComment(text) {
-    if (typeof text !== "string") return false;
-    const match = /^【([^】]+)】/u.exec(text.trimStart());
-    return match !== null && COMMENT_TITLES.has(match[1]);
+    return typeof text === "string" && text.startsWith(TOOL_COMMENT_MARKER);
   }
   async function clearComments(opts) {
     return Word.run(async (context) => {
@@ -3451,35 +3869,171 @@
       return true;
     });
   }
+  async function revealBibliographyEntry(marker, text) {
+    return Word.run(async (context) => {
+      var _a;
+      const body = context.document.body;
+      const prefix = `${marker} ${text}`.trim();
+      const exact = body.search(searchTermFor(prefix), {
+        matchCase: true,
+        matchWholeWord: false,
+        matchWildcards: false,
+        ignorePunct: false,
+        ignoreSpace: false
+      });
+      const fallback = body.search(searchTermFor(marker), {
+        matchCase: true,
+        matchWholeWord: false,
+        matchWildcards: false,
+        ignorePunct: false,
+        ignoreSpace: false
+      });
+      exact.load("items");
+      fallback.load("items");
+      await context.sync();
+      const target = (_a = exact.items.at(-1)) != null ? _a : fallback.items.at(-1);
+      if (!target) return false;
+      target.select();
+      await context.sync();
+      return true;
+    });
+  }
   async function revealFinding(finding2, opts) {
     return revealSpan(finding2, opts);
   }
-  async function confirmBold(context, paragraphs, texts, mentions) {
-    const settled = mentions.filter((mention) => mention.evidence !== "bold");
-    const proposals = mentions.filter((mention) => mention.evidence === "bold");
-    if (proposals.length === 0) return settled;
+  async function confirmMentions(context, paragraphs, texts, mentions) {
+    const asks = (mention) => mention.evidence === "bold" || mention.evidence === "word";
+    const settled = mentions.filter((mention) => !asks(mention));
+    const pending = mentions.filter(asks);
+    if (pending.length === 0) return settled;
     const located = await locateFindings(
       context,
       paragraphs,
       texts,
-      proposals.map((mention) => ({
+      pending.map((mention) => ({
         paragraphIndex: mention.at.paragraphIndex,
         start: mention.at.start,
         matched: mention.at.text,
         mention
       }))
     );
-    for (const { range } of located) range.font.load("bold");
+    for (const { range } of located) range.font.load("bold, superscript");
     await context.sync();
-    return [...settled, ...located.filter((item) => item.range.font.bold).map((item) => item.finding.mention)];
+    const seen = /* @__PURE__ */ new Map();
+    for (const { finding: finding2, range } of located) {
+      seen.set(finding2.mention, {
+        bold: range.font.bold === true,
+        superscript: range.font.superscript === true
+      });
+    }
+    const kept = pending.filter((mention) => {
+      const font = seen.get(mention);
+      if (!font) return mention.evidence !== "bold";
+      if (font.superscript) return false;
+      return mention.evidence !== "bold" || font.bold;
+    });
+    return [...settled, ...kept];
+  }
+  async function bibliographyFormattingFor(context, paragraphs, entries) {
+    var _a, _b, _c, _d;
+    const output = /* @__PURE__ */ new Map();
+    if (entries.length === 0) return output;
+    const paragraphNumbers = [...new Set(entries.map((entry) => entry.paragraphIndex))];
+    const requested = [];
+    for (const paragraphIndex of paragraphNumbers) {
+      const paragraph = paragraphs[paragraphIndex];
+      if (!paragraph) continue;
+      const ranges = paragraph.search("?", { matchWildcards: true });
+      ranges.load("items/text");
+      requested.push({ paragraphIndex, ranges });
+    }
+    await context.sync();
+    const characters = /* @__PURE__ */ new Map();
+    for (const { paragraphIndex, ranges } of requested) {
+      characters.set(paragraphIndex, ranges.items);
+      for (const range of ranges.items) range.font.load("bold, italic");
+    }
+    await context.sync();
+    for (const entry of entries) {
+      const ranges = characters.get(entry.paragraphIndex);
+      const paragraphText = (_b = (_a = paragraphs[entry.paragraphIndex]) == null ? void 0 : _a.text) != null ? _b : "";
+      if (!ranges || ranges.length === 0) continue;
+      let start = entry.start + entry.marker.length;
+      while (/\s/u.test((_c = paragraphText[start]) != null ? _c : "")) start += 1;
+      const end = start + entry.text.length;
+      const runs = [];
+      for (let i = start; i < end; i += 1) {
+        const range = ranges[i];
+        const text = (_d = paragraphText[i]) != null ? _d : "";
+        if (!range || text.length === 0) continue;
+        const bold = range.font.bold === true;
+        const italic = range.font.italic === true;
+        const previous = runs.at(-1);
+        if (previous && previous.bold === bold && previous.italic === italic) {
+          runs[runs.length - 1] = { ...previous, text: previous.text + text };
+        } else {
+          runs.push({ text, bold, italic });
+        }
+      }
+      if (runs.map((run2) => run2.text).join("") === entry.text) output.set(entry, runs);
+    }
+    return output;
+  }
+  function editedNumber(value, edit) {
+    if (edit.mode === "insert") return value >= edit.at ? value + 1 : value;
+    return value === edit.from ? edit.to : value;
+  }
+  function editedNumberText(text, edit) {
+    return text.replace(/\d+/gu, (digits) => String(editedNumber(Number(digits), edit)));
+  }
+  function editedCompoundNumberText(text, edit) {
+    return edit.mode === "replace-label" ? text === edit.from ? edit.to : text : editedNumberText(text, edit);
+  }
+  function rewriteSpans(occurrences2, edit) {
+    return rewriteSpansWith(occurrences2, (text) => editedNumberText(text, edit));
+  }
+  function rewriteSpansWith(occurrences2, replacementFor) {
+    const spans = /* @__PURE__ */ new Map();
+    for (const occurrence of occurrences2) {
+      const replacement = replacementFor(occurrence.text);
+      if (replacement === occurrence.text) continue;
+      const key = `${occurrence.paragraphIndex}:${occurrence.start}:${occurrence.text}`;
+      spans.set(key, {
+        paragraphIndex: occurrence.paragraphIndex,
+        start: occurrence.start,
+        matched: occurrence.text,
+        replacement
+      });
+    }
+    return [...spans.values()];
+  }
+  function editedCitationText(text, edit) {
+    if (edit.mode !== "replace") return editedNumberText(text, edit);
+    const numbers = citedNumbers(text);
+    if (!numbers.includes(edit.from)) return text;
+    const open = text.trimStart().startsWith("[") ? "[" : "";
+    const close = text.trimEnd().endsWith("]") ? "]" : "";
+    return `${open}${numbers.map((value) => editedNumber(value, edit)).join(", ")}${close}`;
+  }
+  async function applyRewrites(context, paragraphs, texts, spans) {
+    const located = await locateFindings(context, paragraphs, texts, spans);
+    const ordered = [...located].sort(
+      (a, b) => a.finding.paragraphIndex - b.finding.paragraphIndex || b.finding.start - a.finding.start
+    );
+    for (const { finding: finding2, range } of ordered) {
+      range.insertText(finding2.replacement, Word.InsertLocation.replace);
+    }
+    if (ordered.length > 0) await context.sync();
+    return ordered.length;
   }
   async function listLabels(opts) {
     return Word.run(async (context) => {
       const { paragraphs, texts } = await loadParagraphs(context, opts.selectionOnly);
       const bibliography = parseBibliography(texts);
+      const bibliographyFormatting = await bibliographyFormattingFor(context, paragraphs, bibliography);
       const inList = bibliographyParagraphs(bibliography);
       const mentions = compoundMentions(texts, compoundLabels(texts), inList);
-      const compounds = buildInventory(await confirmBold(context, paragraphs, texts, mentions));
+      const compounds = buildInventory(await confirmMentions(context, paragraphs, texts, mentions));
       const cited = /* @__PURE__ */ new Map();
       for (const hit of bodyCitations(texts, inList)) {
         for (const number of citedNumbers(hit.text)) {
@@ -3490,7 +4044,7 @@
       const byNumber = new Map(bibliography.map((entry) => [entry.number, entry]));
       const numbers = [.../* @__PURE__ */ new Set([...cited.keys(), ...byNumber.keys()])].sort((a, b) => a - b);
       const references = numbers.map((number) => {
-        var _a;
+        var _a, _b;
         const entry = byNumber.get(number);
         return {
           number,
@@ -3503,7 +4057,8 @@
                 text: entry.marker
               },
               summary: describeEntry(entry),
-              full: entry.text
+              full: entry.text,
+              formatting: (_b = bibliographyFormatting.get(entry)) != null ? _b : [{ text: entry.text, bold: false, italic: false }]
             }
           }
         };
@@ -3515,6 +4070,196 @@
         uncited: numbers.filter((n) => byNumber.has(n) && !cited.has(n)),
         hasBibliography: bibliography.length > 0
       };
+    });
+  }
+  async function listFigureTables(opts) {
+    return Word.run(async (context) => {
+      const { texts } = await loadParagraphs(context, opts.selectionOnly);
+      return { items: figureTableInventory(texts) };
+    });
+  }
+  async function editCompoundNumbers(edit, opts) {
+    return Word.run(async (context) => {
+      if (opts.trackChanges) context.document.changeTrackingMode = Word.ChangeTrackingMode.trackAll;
+      const { paragraphs, texts } = await loadParagraphs(context, opts.selectionOnly);
+      const bibliography = parseBibliography(texts);
+      const mentions = compoundMentions(
+        texts,
+        compoundLabels(texts),
+        bibliographyParagraphs(bibliography)
+      );
+      const confirmed = await confirmMentions(context, paragraphs, texts, mentions);
+      return applyRewrites(
+        context,
+        paragraphs,
+        texts,
+        edit.mode === "replace-label" ? rewriteSpansWith(
+          confirmed.filter((mention) => mention.label === edit.from).map((mention) => mention.at),
+          (text) => editedCompoundNumberText(text, edit)
+        ) : rewriteSpans(confirmed.map((mention) => mention.at), edit)
+      );
+    });
+  }
+  async function confirmedCompoundMentions(context, opts) {
+    const { paragraphs, texts } = await loadParagraphs(context, opts.selectionOnly);
+    const bibliography = parseBibliography(texts);
+    const candidates = compoundMentions(texts, compoundLabels(texts), bibliographyParagraphs(bibliography));
+    return { paragraphs, texts, mentions: await confirmMentions(context, paragraphs, texts, candidates) };
+  }
+  async function highlightCompoundLabelEverywhere(label, color, opts) {
+    return Word.run(async (context) => {
+      const { paragraphs, texts, mentions } = await confirmedCompoundMentions(context, opts);
+      const located = await locateFindings(
+        context,
+        paragraphs,
+        texts,
+        mentions.filter((mention) => mention.label === label).map((mention) => ({
+          paragraphIndex: mention.at.paragraphIndex,
+          start: mention.at.start,
+          matched: mention.at.text
+        }))
+      );
+      for (const { range } of located) range.font.highlightColor = color;
+      if (located.length > 0) await context.sync();
+      return located.length;
+    });
+  }
+  function isMatchingHighlightColor(actual, expected) {
+    const normal = (value) => typeof value === "string" ? value.replace(/^#/u, "").toUpperCase() : "";
+    const aliases = {
+      "FFFF00": ["YELLOW"],
+      "B6FF00": ["BRIGHTGREEN"],
+      "00FF00": ["GREEN"],
+      "80FFFF": ["CYAN", "TURQUOISE"],
+      "80DEEA": ["CYAN", "TURQUOISE"],
+      "00FFFF": ["CYAN", "TURQUOISE"],
+      "8080FF": ["BLUE"],
+      "FF80FF": ["PINK"],
+      "FF00FF": ["MAGENTA"],
+      "FFA0A0": ["RED"],
+      "C0C0C0": ["GRAY"]
+    };
+    const accepted = new Set([...expected].flatMap((color) => {
+      var _a;
+      return [normal(color), ...(_a = aliases[normal(color)]) != null ? _a : []];
+    }));
+    return accepted.has(normal(actual));
+  }
+  async function clearCompoundLabelHighlightsEverywhere(highlights, opts) {
+    if (highlights.size === 0) return 0;
+    return Word.run(async (context) => {
+      var _a;
+      const { paragraphs, texts, mentions } = await confirmedCompoundMentions(context, opts);
+      const targets = /* @__PURE__ */ new Map();
+      for (const mention of mentions) {
+        const colors = highlights.get(mention.label);
+        if (!colors) continue;
+        const key = `${mention.at.paragraphIndex}:${mention.at.start}:${mention.at.text}`;
+        const target = (_a = targets.get(key)) != null ? _a : {
+          paragraphIndex: mention.at.paragraphIndex,
+          start: mention.at.start,
+          matched: mention.at.text,
+          colors: /* @__PURE__ */ new Set()
+        };
+        for (const color of colors) target.colors.add(color);
+        targets.set(key, target);
+      }
+      const located = await locateFindings(context, paragraphs, texts, [...targets.values()]);
+      for (const { range } of located) range.font.load("highlightColor");
+      if (located.length > 0) await context.sync();
+      let cleared = 0;
+      for (const { finding: finding2, range } of located) {
+        if (!isMatchingHighlightColor(range.font.highlightColor, finding2.colors)) continue;
+        range.font.highlightColor = null;
+        cleared += 1;
+      }
+      if (cleared > 0) await context.sync();
+      return cleared;
+    });
+  }
+  function referenceHighlightTargets(texts, bibliography, numberOnly) {
+    var _a;
+    const targets = [];
+    for (const citation of bodyCitations(texts, bibliographyParagraphs(bibliography))) {
+      if (!numberOnly) {
+        for (const number of citedNumbers(citation.text)) {
+          targets.push({ number, paragraphIndex: citation.paragraphIndex, start: citation.start, matched: citation.text });
+        }
+        continue;
+      }
+      const literal = /* @__PURE__ */ new Set();
+      for (const match of citation.text.matchAll(/\d+/gu)) {
+        const number = Number(match[0]);
+        literal.add(number);
+        targets.push({
+          number,
+          paragraphIndex: citation.paragraphIndex,
+          start: citation.start + ((_a = match.index) != null ? _a : 0),
+          matched: match[0]
+        });
+      }
+      for (const number of citedNumbers(citation.text)) {
+        if (!literal.has(number)) {
+          targets.push({ number, paragraphIndex: citation.paragraphIndex, start: citation.start, matched: citation.text });
+        }
+      }
+    }
+    return targets;
+  }
+  async function highlightReferenceNumberEverywhere(number, color, numberOnly, opts) {
+    return Word.run(async (context) => {
+      const { paragraphs, texts } = await loadParagraphs(context, opts.selectionOnly);
+      const bibliography = parseBibliography(texts);
+      const targets = referenceHighlightTargets(texts, bibliography, numberOnly).filter((target) => target.number === number);
+      const located = await locateFindings(context, paragraphs, texts, targets);
+      for (const { range } of located) range.font.highlightColor = color;
+      if (located.length > 0) await context.sync();
+      return located.length;
+    });
+  }
+  async function clearReferenceNumberHighlightsEverywhere(highlights, numberOnly, opts) {
+    if (highlights.size === 0) return 0;
+    return Word.run(async (context) => {
+      const { paragraphs, texts } = await loadParagraphs(context, opts.selectionOnly);
+      const bibliography = parseBibliography(texts);
+      const targets = referenceHighlightTargets(texts, bibliography, numberOnly).filter((target) => highlights.has(target.number));
+      const located = await locateFindings(context, paragraphs, texts, targets);
+      for (const { range } of located) range.font.load("highlightColor");
+      if (located.length > 0) await context.sync();
+      let cleared = 0;
+      for (const { finding: finding2, range } of located) {
+        const colors = highlights.get(finding2.number);
+        if (!colors || !isMatchingHighlightColor(range.font.highlightColor, colors)) continue;
+        range.font.highlightColor = null;
+        cleared += 1;
+      }
+      if (cleared > 0) await context.sync();
+      return cleared;
+    });
+  }
+  async function editReferenceNumbers(edit, opts) {
+    return Word.run(async (context) => {
+      if (opts.trackChanges) context.document.changeTrackingMode = Word.ChangeTrackingMode.trackAll;
+      const { paragraphs, texts } = await loadParagraphs(context, opts.selectionOnly);
+      const bibliography = parseBibliography(texts);
+      const citationSpans = rewriteSpansWith(
+        bodyCitations(texts, bibliographyParagraphs(bibliography)),
+        (text) => editedCitationText(text, edit)
+      );
+      const bibliographySpans = rewriteSpans(
+        bibliography.map((entry) => ({
+          paragraphIndex: entry.paragraphIndex,
+          start: entry.start,
+          text: entry.marker
+        })),
+        edit
+      );
+      return applyRewrites(
+        context,
+        paragraphs,
+        texts,
+        [...citationSpans, ...bibliographySpans]
+      );
     });
   }
   async function paragraphPages(indices, opts) {
@@ -3543,6 +4288,19 @@
       return pages;
     }
   }
+  async function documentPageCount(opts) {
+    try {
+      return await Word.run(async (context) => {
+        const range = opts.selectionOnly ? context.document.getSelection() : context.document.body.getRange();
+        const pages = range.pages;
+        pages.load("items/index");
+        await context.sync();
+        return pages.items.length > 0 ? pages.items.length : null;
+      });
+    } catch {
+      return null;
+    }
+  }
   async function listFonts(opts) {
     return Word.run(async (context) => {
       const { paragraphs } = await loadParagraphs(context, opts.selectionOnly);
@@ -3558,13 +4316,52 @@
       return replaceFont(context, paragraphs, from, to);
     });
   }
+  async function highlightFontEverywhere(name, color, opts) {
+    return Word.run(async (context) => {
+      const { paragraphs } = await loadParagraphs(context, opts.selectionOnly);
+      return highlightFont(context, paragraphs, name, color);
+    });
+  }
+  async function clearFontHighlightsEverywhere(highlights, opts) {
+    return Word.run(async (context) => {
+      const { paragraphs } = await loadParagraphs(context, opts.selectionOnly);
+      return clearFontHighlights(context, paragraphs, highlights);
+    });
+  }
+  async function listCharacterStyles(opts) {
+    return Word.run(async (context) => {
+      const { paragraphs } = await loadParagraphs(context, opts.selectionOnly);
+      return scanCharacterStyles(context, paragraphs);
+    });
+  }
+  async function replaceCharacterStyleEverywhere(from, to, opts) {
+    return Word.run(async (context) => {
+      if (opts.trackChanges) context.document.changeTrackingMode = Word.ChangeTrackingMode.trackAll;
+      const { paragraphs } = await loadParagraphs(context, opts.selectionOnly);
+      return replaceCharacterStyle(context, paragraphs, from, to);
+    });
+  }
+  async function highlightCharacterStyleEverywhere(style, color, opts) {
+    return Word.run(async (context) => {
+      const { paragraphs } = await loadParagraphs(context, opts.selectionOnly);
+      return highlightCharacterStyle(context, paragraphs, style, color);
+    });
+  }
+  async function clearCharacterStyleHighlightsEverywhere(highlights, opts) {
+    return Word.run(async (context) => {
+      const { paragraphs } = await loadParagraphs(context, opts.selectionOnly);
+      return clearCharacterStyleHighlights(context, paragraphs, highlights);
+    });
+  }
   async function applyFindings(findings, opts) {
     const paragraphFixes = findings.filter((f) => isParagraphCheckId(f.ruleId));
     const requested = findings.filter(
       (f) => !isParagraphCheckId(f.ruleId) && (f.replacement !== void 0 || isFormatCheckId(f.ruleId))
     );
     const actionable = orderForApply(requested);
-    if (actionable.length === 0 && paragraphFixes.length === 0) return { applied: 0, skipped: 0 };
+    if (actionable.length === 0 && paragraphFixes.length === 0) {
+      return { applied: 0, skipped: 0, appliedFindings: [] };
+    }
     return Word.run(async (context) => {
       if (opts.trackChanges) {
         context.document.changeTrackingMode = Word.ChangeTrackingMode.trackAll;
@@ -3572,23 +4369,35 @@
       const { paragraphs, texts } = await loadParagraphs(context, opts.selectionOnly);
       const located = await locateFindings(context, paragraphs, texts, actionable);
       let applied = 0;
+      const appliedFindings = [];
       for (const item of paragraphFixes) {
         const paragraph = paragraphs[item.paragraphIndex];
-        if (paragraph && applyParagraphFix(item.ruleId, paragraph)) applied += 1;
+        if (paragraph && applyParagraphFix(item.ruleId, paragraph)) {
+          applied += 1;
+          appliedFindings.push(item);
+        }
       }
       for (const { finding: finding2, range } of located) {
         if (isFormatCheckId(finding2.ruleId)) {
           const latinFont = preferredLatinFont(opts.bodyFont) === "Arial" ? "Arial" : opts.bodyFont;
           const target = finding2.replacement === void 0 ? range : range.insertText(finding2.replacement, Word.InsertLocation.replace);
-          if (applyFormatFix(finding2.ruleId, target.font, latinFont)) applied += 1;
+          if (applyFormatFix(finding2.ruleId, target.font, latinFont)) {
+            applied += 1;
+            appliedFindings.push(finding2);
+          }
           continue;
         }
         if (finding2.replacement === void 0) continue;
         range.insertText(finding2.replacement, Word.InsertLocation.replace);
         applied += 1;
+        appliedFindings.push(finding2);
       }
       await context.sync();
-      return { applied, skipped: requested.length + paragraphFixes.length - applied };
+      return {
+        applied,
+        skipped: requested.length + paragraphFixes.length - applied,
+        appliedFindings
+      };
     });
   }
   function orderForApply(findings) {
@@ -3614,7 +4423,11 @@
 
   // src/taskpane/prefs.ts
   var KEY = "document-corrector.prefs.v1";
-  var DEFAULTS_VERSION = 1;
+  var DEFAULTS_VERSION = 2;
+  var NEWLY_DEFAULT_ON = Object.freeze([
+    "greek-cjk-space"
+    // DEFAULTS_VERSION 2
+  ]);
   var DEFAULT_SPACE_COLOR = "#80DEEA";
   var DEFAULT_PREFERENCES = Object.freeze({
     defaultsVersion: DEFAULTS_VERSION,
@@ -3625,15 +4438,17 @@
     selectionOnly: false,
     trackChanges: false,
     markerColors: Object.freeze({}),
-    spaceColor: DEFAULT_SPACE_COLOR
+    halfSpaceColor: DEFAULT_SPACE_COLOR,
+    fullSpaceColor: DEFAULT_SPACE_COLOR
   });
   function markerColor(prefs2, category) {
     var _a;
     return (_a = prefs2.markerColors[category]) != null ? _a : CATEGORIES[category].highlight;
   }
   function normalize2(raw) {
-    var _a;
+    var _a, _b, _c, _d;
     const source = raw != null ? raw : {};
+    const legacySpaceColor = source.spaceColor;
     const strings = (value, fallback) => Array.isArray(value) ? value.filter((v) => typeof v === "string") : fallback;
     const length = Number(source.maxSentenceLength);
     const font = typeof source.bodyFont === "string" ? source.bodyFont.trim() : "";
@@ -3647,7 +4462,10 @@
       selectionOnly: source.selectionOnly === true,
       trackChanges: source.trackChanges === true,
       markerColors: markerColors(source.markerColors),
-      spaceColor: (_a = paletteColor(source.spaceColor)) != null ? _a : DEFAULT_SPACE_COLOR
+      // `spaceColor` is the setting saved by versions before half/full-width
+      // spaces were independently configurable. It remains the migration fallback.
+      halfSpaceColor: (_b = paletteColor((_a = source.halfSpaceColor) != null ? _a : legacySpaceColor)) != null ? _b : DEFAULT_SPACE_COLOR,
+      fullSpaceColor: (_d = paletteColor((_c = source.fullSpaceColor) != null ? _c : legacySpaceColor)) != null ? _d : DEFAULT_SPACE_COLOR
     };
   }
   function markerColors(raw) {
@@ -3670,10 +4488,13 @@
   }
   function migrate(prefs2) {
     if (prefs2.defaultsVersion >= DEFAULTS_VERSION) return prefs2;
+    const turnedOn = new Set(NEWLY_DEFAULT_ON);
     return {
       ...prefs2,
       defaultsVersion: DEFAULTS_VERSION,
-      disabledRules: [.../* @__PURE__ */ new Set([...prefs2.disabledRules, ...DEFAULT_DISABLED_RULES])],
+      disabledRules: [.../* @__PURE__ */ new Set([...prefs2.disabledRules, ...DEFAULT_DISABLED_RULES])].filter(
+        (id) => !turnedOn.has(id)
+      ),
       disabledEntries: [.../* @__PURE__ */ new Set([...prefs2.disabledEntries, ...DEFAULT_DISABLED_ENTRIES])]
     };
   }
@@ -3701,24 +4522,40 @@
 
   // src/taskpane/ignored.ts
   function ignoreKey(finding2) {
-    return `${finding2.ruleId}${finding2.paragraphIndex}${finding2.matched}`;
+    return `${finding2.ruleId}${finding2.paragraphIndex}${finding2.matched}`;
   }
   var IgnoreList = class {
-    constructor() {
+    // 引数プロパティ（constructor(private readonly …)）にはしない。node --test は
+    // 型を剥がすだけで変換はしないので、走らせた瞬間に構文エラーになる。
+    constructor(onChange = () => void 0) {
       /** key → the finding as it looked when it was ignored, for the list display. */
       this.items = /* @__PURE__ */ new Map();
+      this.onChange = onChange;
     }
     add(finding2) {
       this.items.set(ignoreKey(finding2), finding2);
+      this.onChange();
+    }
+    /** 「まとめて無視」 — one change, so the document is written once, not once per finding. */
+    addAll(findings) {
+      for (const finding2 of findings) this.items.set(ignoreKey(finding2), finding2);
+      this.onChange();
     }
     remove(key) {
       this.items.delete(key);
+      this.onChange();
     }
     has(finding2) {
       return this.items.has(ignoreKey(finding2));
     }
     clear() {
       this.items.clear();
+      this.onChange();
+    }
+    /** Replaces the whole list with what was stored in the document. */
+    restore(findings) {
+      this.items.clear();
+      for (const finding2 of findings) this.items.set(ignoreKey(finding2), finding2);
     }
     get size() {
       return this.items.size;
@@ -3727,11 +4564,84 @@
     entries() {
       return [...this.items.entries()].map(([key, finding2]) => ({ key, finding: finding2 })).sort((a, b) => a.finding.paragraphIndex - b.finding.paragraphIndex || a.finding.start - b.finding.start);
     }
+    /** The findings themselves, in document order — what gets stored. */
+    findings() {
+      return this.entries().map(({ finding: finding2 }) => finding2);
+    }
     /** Drops the findings the user has chosen not to see. */
     filter(findings) {
       return findings.filter((f) => !this.has(f));
     }
   };
+  var MAX_IGNORED = 2e3;
+  var SEVERITIES = ["fix", "confirm", "note"];
+  function parseFinding(raw) {
+    if (raw === null || typeof raw !== "object") return null;
+    const source = raw;
+    const text = (value) => typeof value === "string" ? value : null;
+    const whole = (value) => typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
+    const ruleId = text(source.ruleId);
+    const matched = text(source.matched);
+    const message = text(source.message);
+    const paragraphIndex = whole(source.paragraphIndex);
+    const start = whole(source.start);
+    const end = whole(source.end);
+    if (ruleId === null || matched === null || message === null) return null;
+    if (paragraphIndex === null || start === null || end === null) return null;
+    const category = text(source.category);
+    const severity = text(source.severity);
+    if (category === null || !(category in CATEGORIES)) return null;
+    if (severity === null || !SEVERITIES.includes(severity)) return null;
+    const replacement = text(source.replacement);
+    return {
+      ruleId,
+      category,
+      severity,
+      paragraphIndex,
+      start,
+      end,
+      matched,
+      message,
+      ...replacement === null ? {} : { replacement }
+    };
+  }
+  function parseIgnored(raw) {
+    if (!Array.isArray(raw)) return [];
+    const findings = [];
+    for (const entry of raw) {
+      const finding2 = parseFinding(entry);
+      if (finding2 !== null) findings.push(finding2);
+      if (findings.length >= MAX_IGNORED) break;
+    }
+    return findings;
+  }
+
+  // src/taskpane/docStore.ts
+  function settings() {
+    var _a, _b, _c;
+    try {
+      return (_c = (_b = (_a = Office.context) == null ? void 0 : _a.document) == null ? void 0 : _b.settings) != null ? _c : null;
+    } catch {
+      return null;
+    }
+  }
+  function readDocumentValue(key) {
+    var _a, _b;
+    try {
+      return (_b = (_a = settings()) == null ? void 0 : _a.get(key)) != null ? _b : null;
+    } catch {
+      return null;
+    }
+  }
+  function writeDocumentValue(key, value) {
+    const store = settings();
+    if (!store) return;
+    try {
+      store.set(key, value);
+      store.saveAsync(() => void 0);
+    } catch {
+    }
+  }
 
   // src/core/version.ts
   var VERSION = /^\d+(?:\.\d+){0,3}$/u;
@@ -3768,6 +4678,26 @@
       ...typeof source.note === "string" && source.note.length > 0 ? { note: source.note } : {}
     };
   }
+  var VERSION_URL = "version.json";
+  async function fetchVersionInfo() {
+    try {
+      const response = await fetch(VERSION_URL, { cache: "no-store" });
+      if (!response.ok) return null;
+      return parseVersionInfo(await response.json());
+    } catch {
+      return null;
+    }
+  }
+  function versionLine(installed, latest) {
+    var _a;
+    const current2 = parseVersion(installed);
+    const newest = parseVersion(latest);
+    const notes = [];
+    if (!current2) notes.push("\u3053\u306E\u4ED5\u7D44\u307F\u3088\u308A\u524D\u306E\u7248");
+    if (newest) notes.push(isOutdated(installed, latest) ? `\u6700\u65B0\u306F ${newest.text}` : "\u6700\u65B0\u7248\u3067\u3059");
+    const shown = (_a = current2 == null ? void 0 : current2.text) != null ? _a : "\u4E0D\u660E";
+    return notes.length === 0 ? `\u30D0\u30FC\u30B8\u30E7\u30F3 ${shown}` : `\u30D0\u30FC\u30B8\u30E7\u30F3 ${shown}\uFF08${notes.join("\u3002")}\uFF09`;
+  }
   function installedVersion(search) {
     const value = new URLSearchParams(search).get("v");
     return value && value.length > 0 ? value : null;
@@ -3776,20 +4706,101 @@
   // src/taskpane/taskpane.ts
   var current = null;
   var visibleCategories = new Set(Object.keys(CATEGORIES));
-  var ignored = new IgnoreList();
+  var visibleSeverities = /* @__PURE__ */ new Set(["fix", "confirm", "note"]);
+  var ignored = new IgnoreList(() => saveIgnored());
   var painted = [];
   var paintedSpaces = false;
+  var paintedFonts = /* @__PURE__ */ new Map();
+  var paintedCharacterStyles = /* @__PURE__ */ new Map();
+  var paintedCompoundLabels = /* @__PURE__ */ new Map();
+  var paintedReferenceMarkers = /* @__PURE__ */ new Map();
+  var paintedReferenceNumbers = /* @__PURE__ */ new Map();
+  var selectedFontHighlightColor = "#80DEEA";
+  var selectedStyleHighlightColor = "#80DEEA";
+  var selectedCompoundHighlightColor = "#80DEEA";
+  var selectedReferenceHighlightColor = "#80DEEA";
+  var selectedHalfSpaceColor = "#80DEEA";
+  var selectedFullSpaceColor = "#80DEEA";
   var prefs = DEFAULT_PREFERENCES;
+  var reviewedPages = null;
+  var resultTab = "open";
+  var fixedRecords = [];
+  var COMPOUND_NOTES_KEY = "document-corrector.compound-notes.v1";
+  var compoundNotes = /* @__PURE__ */ new Map();
+  var lastLabels = null;
+  var selectedReferenceNumber = null;
+  var crossrefMetadata = /* @__PURE__ */ new Map();
+  var crossrefProgress = null;
   Office.onReady((info) => {
     if (info.host !== Office.HostType.Word) {
       setStatus("\u3053\u306E\u30A2\u30C9\u30A4\u30F3\u306F Word \u5C02\u7528\u3067\u3059\u3002");
       return;
     }
     prefs = loadPreferences();
+    selectedHalfSpaceColor = prefs.halfSpaceColor;
+    selectedFullSpaceColor = prefs.fullSpaceColor;
+    restoreIgnored();
+    restoreCompoundNotes();
     byId("restore-all").onclick = () => {
       ignored.clear();
       renderReview();
     };
+    byId("open-help").onclick = () => showHelp();
+    for (const element of document.querySelectorAll("[data-result-tab]")) {
+      element.onclick = () => {
+        resultTab = element.dataset.resultTab;
+        renderReview();
+      };
+    }
+    byId("compound-insert").onclick = run(() => editNumbers("compounds", {
+      mode: "insert",
+      at: positiveNumber("compound-insert-number")
+    }));
+    byId("compound-replace").onclick = run(() => editNumbers("compounds", compoundLabelEdit()));
+    byId("reference-insert").onclick = run(() => editNumbers("references", {
+      mode: "insert",
+      at: positiveNumber("reference-insert-number")
+    }));
+    byId("reference-replace").onclick = run(() => editNumbers("references", {
+      mode: "replace",
+      from: positiveNumber("reference-from"),
+      to: positiveNumber("reference-to")
+    }));
+    const redrawReferences = () => {
+      if (lastLabels) renderReferences(lastLabels);
+    };
+    byId("reference-search").oninput = redrawReferences;
+    byId("reference-filter").onchange = redrawReferences;
+    byId("reference-authors").onchange = redrawReferences;
+    byId("crossref-enabled").onchange = () => {
+      if (!lastLabels) return;
+      renderReferences(lastLabels);
+      if (byId("crossref-enabled").checked) void enrichReferences(lastLabels);
+    };
+    byId("reference-list-jump").onclick = run(() => jumpToSelectedReference());
+    byId("font-highlight").onclick = run(() => highlightSelectedFont());
+    byId("font-replace").onclick = run(() => replaceSelectedFont());
+    byId("style-highlight").onclick = run(() => highlightSelectedCharacterStyle());
+    byId("style-replace").onclick = run(() => replaceSelectedCharacterStyle());
+    byId("highlight-spaces").onclick = run(() => highlightSpaces());
+    setUpHighlightColorPicker("half-space", () => selectedHalfSpaceColor, (color) => {
+      selectedHalfSpaceColor = color;
+      prefs = { ...prefs, halfSpaceColor: color };
+      savePreferences(prefs);
+    });
+    setUpHighlightColorPicker("full-space", () => selectedFullSpaceColor, (color) => {
+      selectedFullSpaceColor = color;
+      prefs = { ...prefs, fullSpaceColor: color };
+      savePreferences(prefs);
+    });
+    byId("compound-highlight").onclick = run(() => highlightSelectedCompoundLabel());
+    setUpHighlightColorPicker("compound-highlight", () => selectedCompoundHighlightColor, (color) => {
+      selectedCompoundHighlightColor = color;
+    });
+    byId("reference-highlight").onclick = run(() => highlightSelectedReferenceNumber());
+    setUpHighlightColorPicker("reference-highlight", () => selectedReferenceHighlightColor, (color) => {
+      selectedReferenceHighlightColor = color;
+    });
     byId("back-to-review").onclick = () => {
       showView("review");
       if (current) renderReview();
@@ -3801,6 +4812,143 @@
     checkForUpdate();
     setStatus("\u30EA\u30DC\u30F3\u306E\uFF3B\u6587\u66F8\u3092\u30C1\u30A7\u30C3\u30AF\uFF3D\u3092\u62BC\u3059\u3068\u3001\u30C1\u30A7\u30C3\u30AF\u30EA\u30B9\u30C8\u306E\u70B9\u691C\u3092\u59CB\u3081\u307E\u3059\u3002");
   });
+  var IGNORED_KEY = "document-corrector.ignored.v1";
+  function restoreIgnored() {
+    ignored.restore(parseIgnored(readDocumentValue(IGNORED_KEY)));
+    renderIgnored();
+  }
+  function saveIgnored() {
+    writeDocumentValue(IGNORED_KEY, ignored.findings().slice(0, MAX_IGNORED));
+  }
+  function restoreCompoundNotes() {
+    compoundNotes.clear();
+    const raw = readDocumentValue(COMPOUND_NOTES_KEY);
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return;
+    for (const [label, value] of Object.entries(raw)) {
+      if (value === null || typeof value !== "object" || Array.isArray(value)) continue;
+      const source = value;
+      if (typeof source.text !== "string") continue;
+      const image = typeof source.image === "string" && source.image.startsWith("data:image/") ? source.image : void 0;
+      compoundNotes.set(label, { text: source.text.slice(0, 1e4), ...image ? { image } : {} });
+    }
+  }
+  function persistCompoundNotes() {
+    writeDocumentValue(COMPOUND_NOTES_KEY, Object.fromEntries(compoundNotes));
+  }
+  function updateCompoundThumbnail(label) {
+    var _a, _b;
+    const image = (_a = compoundNotes.get(label)) == null ? void 0 : _a.image;
+    for (const thumbnail of document.querySelectorAll(".compound-thumbnail")) {
+      if (thumbnail.dataset.compoundLabel !== label) continue;
+      thumbnail.src = image != null ? image : "";
+      thumbnail.hidden = image === void 0;
+      (_b = thumbnail.closest(".compound-item")) == null ? void 0 : _b.classList.toggle("has-thumbnail", image !== void 0);
+    }
+  }
+  var MAX_COMPOUND_IMAGE_BYTES = 5e6;
+  function compoundNoteEditor(label) {
+    var _a, _b, _c;
+    const editor = document.createElement("section");
+    editor.className = "compound-note";
+    const heading = document.createElement("p");
+    heading.className = "compound-detail-heading";
+    heading.textContent = "\u30E1\u30E2";
+    const textarea = document.createElement("textarea");
+    textarea.className = "compound-note-text";
+    textarea.rows = 1;
+    textarea.value = (_b = (_a = compoundNotes.get(label)) == null ? void 0 : _a.text) != null ? _b : "";
+    textarea.setAttribute("aria-label", `\u5316\u5408\u7269 ${label} \u306E\u30E1\u30E2`);
+    const pasteTarget = document.createElement("div");
+    pasteTarget.className = "compound-image-paste";
+    pasteTarget.tabIndex = 0;
+    pasteTarget.setAttribute("role", "button");
+    pasteTarget.textContent = "\u3053\u3053\u306B\u753B\u50CF\u3092\u8CBC\u308A\u4ED8\u3051\uFF08\u2318V\uFF09";
+    pasteTarget.onclick = () => pasteTarget.focus();
+    const imageHeading = document.createElement("p");
+    imageHeading.className = "compound-detail-heading compound-image-heading";
+    imageHeading.textContent = "\u753B\u50CF\uFF08\u6700\u5927 5 MB\uFF09";
+    const fileLabel = document.createElement("label");
+    fileLabel.className = "compound-image-file-button";
+    fileLabel.textContent = "\u30D5\u30A1\u30A4\u30EB\u304B\u3089\u9078\u629E";
+    const fileInput = document.createElement("input");
+    fileInput.id = `compound-image-${label}`;
+    fileInput.type = "file";
+    fileInput.accept = "image/*";
+    fileInput.className = "compound-image-input";
+    fileLabel.htmlFor = fileInput.id;
+    const imageControls = document.createElement("div");
+    imageControls.className = "compound-image-controls";
+    imageControls.append(pasteTarget, fileLabel, fileInput);
+    const preview = document.createElement("img");
+    preview.className = "compound-image";
+    preview.alt = `\u5316\u5408\u7269 ${label} \u306E\u30E1\u30E2\u306E\u6DFB\u4ED8\u753B\u50CF`;
+    const showImage = () => {
+      var _a2;
+      const image = (_a2 = compoundNotes.get(label)) == null ? void 0 : _a2.image;
+      preview.src = image != null ? image : "";
+      preview.hidden = image === void 0;
+    };
+    showImage();
+    const save = button("\u30E1\u30E2\u3092\u4FDD\u5B58", () => {
+      var _a2;
+      const image = (_a2 = compoundNotes.get(label)) == null ? void 0 : _a2.image;
+      compoundNotes.set(label, { text: textarea.value.slice(0, 1e4), ...image ? { image } : {} });
+      persistCompoundNotes();
+      setStatus(`\u5316\u5408\u7269 ${label} \u306E\u30E1\u30E2\u3092\u539F\u7A3F\u306B\u4FDD\u5B58\u3057\u307E\u3057\u305F\u3002`);
+    });
+    save.classList.add("primary");
+    const memoControls = document.createElement("div");
+    memoControls.className = "compound-memo-controls";
+    memoControls.append(textarea, save);
+    const imageActions = document.createElement("div");
+    imageActions.className = "row compact compound-image-actions";
+    const clear = button("\u753B\u50CF\u3092\u5916\u3059", () => {
+      compoundNotes.set(label, { text: textarea.value.slice(0, 1e4) });
+      persistCompoundNotes();
+      showImage();
+      updateCompoundThumbnail(label);
+      clear.hidden = true;
+      setStatus(`\u5316\u5408\u7269 ${label} \u306E\u6DFB\u4ED8\u753B\u50CF\u3092\u5916\u3057\u307E\u3057\u305F\u3002`);
+    });
+    clear.hidden = ((_c = compoundNotes.get(label)) == null ? void 0 : _c.image) === void 0;
+    imageActions.append(clear);
+    const attachImage = (image) => {
+      if (image.size > MAX_COMPOUND_IMAGE_BYTES) {
+        setStatus("\u753B\u50CF\u304C\u5927\u304D\u3059\u304E\u307E\u3059\u30025 MB \u4EE5\u4E0B\u306E\u753B\u50CF\u3092\u9078\u3093\u3067\u304F\u3060\u3055\u3044\u3002");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result !== "string" || !reader.result.startsWith("data:image/")) {
+          setStatus("\u753B\u50CF\u3092\u8AAD\u307F\u8FBC\u3081\u307E\u305B\u3093\u3067\u3057\u305F\u3002");
+          return;
+        }
+        compoundNotes.set(label, { text: textarea.value.slice(0, 1e4), image: reader.result });
+        persistCompoundNotes();
+        showImage();
+        updateCompoundThumbnail(label);
+        clear.hidden = false;
+        setStatus(`\u5316\u5408\u7269 ${label} \u306E\u30E1\u30E2\u306B\u753B\u50CF\u3092\u6DFB\u4ED8\u3057\u307E\u3057\u305F\u3002`);
+      };
+      reader.onerror = () => setStatus("\u753B\u50CF\u3092\u8AAD\u307F\u8FBC\u3081\u307E\u305B\u3093\u3067\u3057\u305F\u3002");
+      reader.readAsDataURL(image);
+    };
+    editor.addEventListener("paste", (event) => {
+      var _a2, _b2, _c2;
+      const image = (_c2 = Array.from((_b2 = (_a2 = event.clipboardData) == null ? void 0 : _a2.items) != null ? _b2 : []).find((item) => item.type.startsWith("image/"))) == null ? void 0 : _c2.getAsFile();
+      if (!image) return;
+      event.preventDefault();
+      attachImage(image);
+    });
+    fileInput.onchange = () => {
+      var _a2;
+      const image = (_a2 = fileInput.files) == null ? void 0 : _a2[0];
+      fileInput.value = "";
+      if (image) attachImage(image);
+    };
+    editor.append(heading, memoControls, imageHeading, imageControls, preview, imageActions);
+    return editor;
+  }
   function stayLoaded() {
     var _a, _b;
     (_b = (_a = Office.addin) == null ? void 0 : _a.setStartupBehavior) == null ? void 0 : _b.call(_a, Office.StartupBehavior.load).catch(() => void 0);
@@ -3813,19 +4961,14 @@
       else setStatus("\u30EA\u30DC\u30F3\u306E\uFF3B\u6587\u66F8\u3092\u30C1\u30A7\u30C3\u30AF\uFF3D\u3092\u62BC\u3059\u3068\u3001\u30C1\u30A7\u30C3\u30AF\u30EA\u30B9\u30C8\u306E\u70B9\u691C\u3092\u59CB\u3081\u307E\u3059\u3002");
     }).catch(() => void 0);
   }
-  var VERSION_URL = "version.json";
   function checkForUpdate() {
     void (async () => {
-      try {
-        const response = await fetch(VERSION_URL, { cache: "no-store" });
-        if (!response.ok) return;
-        const info = parseVersionInfo(await response.json());
-        if (!info) return;
-        const installed = installedVersion(location.search);
-        if (!isOutdated(installed, info.manifestVersion)) return;
-        showUpdateBanner(info, installed);
-      } catch {
-      }
+      const installed = installedVersion(location.search);
+      const info = await fetchVersionInfo();
+      byId("help-version").textContent = versionLine(installed, info == null ? void 0 : info.manifestVersion);
+      if (!info) return;
+      if (!isOutdated(installed, info.manifestVersion)) return;
+      showUpdateBanner(info, installed);
     })();
   }
   function showUpdateBanner(info, installed) {
@@ -3877,24 +5020,19 @@
     Office.actions.associate("clearAllHighlights", command(clearAllHighlights2));
     Office.actions.associate("listCompounds", command(listCompounds));
     Office.actions.associate("listReferences", command(listReferences));
+    Office.actions.associate("listFigures", command(listFigures));
     Office.actions.associate("replaceFonts", command(replaceFonts));
-    Office.actions.associate(
-      "highlightSpaces",
-      command(async () => {
-        setStatus("\u30B9\u30DA\u30FC\u30B9\u3092\u5F37\u8ABF\u3057\u3066\u3044\u307E\u3059\u2026");
-        const n = await highlightAllSpaces(options());
-        paintedSpaces = true;
-        setStatus(`${n} \u7B87\u6240\u306E\u30B9\u30DA\u30FC\u30B9\u3092\u5857\u308A\u307E\u3057\u305F\u3002\u7247\u4ED8\u3051\u306F\uFF3B\u30A2\u30C9\u30A4\u30F3\u306E\u5857\u308A\u3092\u524A\u9664\uFF3D\u3002`);
-      })
-    );
+    Office.actions.associate("showHelp", command(async () => showHelp()));
   }
   function byId(id) {
     const element = document.getElementById(id);
     if (!element) throw new Error(`missing element #${id}`);
     return element;
   }
-  function setStatus(message) {
-    byId("status").textContent = message;
+  function setStatus(message, busy = false) {
+    const status = byId("status");
+    status.textContent = message;
+    status.classList.toggle("working", busy);
   }
   function show(id, visible) {
     byId(id).hidden = !visible;
@@ -3922,11 +5060,29 @@
     review: "view-review",
     compounds: "view-compounds",
     references: "view-references",
-    fonts: "view-fonts"
+    figures: "view-figures",
+    fonts: "view-fonts",
+    help: "view-help"
   };
+  var VIEW_TITLES = {
+    review: "\u70B9\u691C\u7D50\u679C",
+    compounds: "\u5316\u5408\u7269",
+    references: "\u6587\u732E",
+    figures: "\u56F3\u30FB\u8868",
+    fonts: "\u6587\u5B57",
+    help: "\u4F7F\u3044\u65B9"
+  };
+  function showHelp() {
+    showView("help");
+    setStatus("\u4F7F\u3044\u65B9\u3067\u3059\u3002\uFF3B\u2190 \u6307\u6458\u4E00\u89A7\u306B\u623B\u308B\uFF3D\u3067\u623B\u308C\u307E\u3059\u3002");
+  }
   function showView(view) {
     for (const [name, id] of Object.entries(VIEWS)) show(id, name === view);
     show("view-nav", view !== "review");
+    show("reference-list-jump", view === "references");
+    byId("panel-title").textContent = VIEW_TITLES[view];
+    byId("panel-head").classList.toggle("context-view", view !== "review");
+    if (view === "fonts") setStatus("");
   }
   function options() {
     return {
@@ -3935,7 +5091,8 @@
       bodyFont: prefs.bodyFont,
       disabledRules: prefs.disabledRules,
       markerColors: prefs.markerColors,
-      spaceColor: prefs.spaceColor,
+      halfSpaceColor: prefs.halfSpaceColor,
+      fullSpaceColor: prefs.fullSpaceColor,
       reviewOptions: {
         settings: { maxSentenceLength: prefs.maxSentenceLength },
         disabledEntries: prefs.disabledEntries
@@ -3952,6 +5109,7 @@
         return;
       }
       const url = new URL(page, location.href);
+      url.search = location.search;
       url.hash = encodeURIComponent(JSON.stringify(prefs));
       Office.context.ui.displayDialogAsync(
         url.href,
@@ -3994,24 +5152,48 @@
     if (current) run(runReview)();
   }
   async function runReview() {
-    setStatus("\u70B9\u691C\u4E2D\u2026");
     showView("review");
-    current = await reviewDocument(options());
+    const started = Date.now();
+    const elapsed = () => {
+      const seconds = Math.round((Date.now() - started) / 1e3);
+      return seconds < 3 ? "" : `\u3000${seconds} \u79D2\u7D4C\u904E`;
+    };
+    setStatus("\u70B9\u691C\u306E\u6E96\u5099\u3092\u3057\u3066\u3044\u307E\u3059\u2026", true);
+    current = await reviewDocument(options(), ({ step, of, what }) => {
+      setStatus(`${what}\u2026\uFF08${step}/${of}\uFF09${elapsed()}`, true);
+    });
+    [reviewedPages, pageOf] = await Promise.all([
+      documentPageCount(options()),
+      paragraphPages(current.findings.map((finding2) => finding2.paragraphIndex), options())
+    ]);
     renderReview();
   }
   function renderReview() {
     if (!current) return;
-    const { findings, fontInventory, paragraphCount } = current;
+    const { findings, paragraphCount } = current;
     const live = ignored.filter(findings);
+    renderResultSummary(live);
+    renderConditionFilters(live);
     renderCategoryFilters(live);
     renderFindings(live);
+    renderFixed();
     renderIgnored();
-    renderFonts(fontInventory);
+    show("start-section", false);
     const hiddenCount = findings.length - live.length;
     const suffix = hiddenCount > 0 ? `\uFF08\u7121\u8996 ${hiddenCount} \u4EF6\u3092\u9664\u304F\uFF09` : "";
+    const scope = reviewedPages === null ? `${paragraphCount} \u6BB5\u843D` : `${reviewedPages} \u30DA\u30FC\u30B8`;
     setStatus(
-      live.length === 0 ? `${paragraphCount} \u6BB5\u843D\u3092\u70B9\u691C\u3057\u307E\u3057\u305F\u3002\u6307\u6458\u306F\u3042\u308A\u307E\u305B\u3093${suffix}\u3002` : `${paragraphCount} \u6BB5\u843D\u306B ${live.length} \u4EF6\u306E\u6307\u6458${suffix}\u3002`
+      live.length === 0 ? `${scope}\u3092\u70B9\u691C\u3057\u307E\u3057\u305F\u3002\u6307\u6458\u306F\u3042\u308A\u307E\u305B\u3093${suffix}\u3002` : `${scope}\u3092\u70B9\u691C\u3057\u307E\u3057\u305F\u3002\u672A\u51E6\u7406\u306E\u6307\u6458\u306F ${live.length} \u4EF6\u3067\u3059${suffix}\u3002`
     );
+  }
+  function renderResultSummary(findings) {
+    byId("result-open-count").textContent = String(findings.length);
+    byId("result-fixed-count").textContent = String(fixedRecords.length);
+    byId("result-ignored-count").textContent = String(ignored.size);
+    for (const element of document.querySelectorAll("[data-result-tab]")) {
+      element.setAttribute("aria-pressed", String(element.dataset.resultTab === resultTab));
+    }
+    show("result-summary", true);
   }
   function renderCategoryFilters(findings) {
     const counts = groupByCategory(findings);
@@ -4021,7 +5203,7 @@
       var _a, _b;
       return ((_b = (_a = counts.get(id)) == null ? void 0 : _a.length) != null ? _b : 0) > 0;
     });
-    show("summary-section", present.length > 0);
+    show("summary-section", present.length > 0 && resultTab === "open");
     for (const id of present) {
       const info = CATEGORIES[id];
       const label = document.createElement("label");
@@ -4044,21 +5226,56 @@
       container.appendChild(label);
     }
   }
+  function renderConditionFilters(findings) {
+    const container = byId("condition-filters");
+    container.innerHTML = "";
+    const conditions = [
+      { severity: "fix", label: "\u81EA\u52D5\u4FEE\u6B63\u53EF" },
+      { severity: "confirm", label: "\u78BA\u8A8D\u304C\u5FC5\u8981" },
+      { severity: "note", label: "\u5185\u5BB9\u3092\u78BA\u8A8D" }
+    ];
+    for (const { severity, label: text } of conditions) {
+      const count = findings.filter((finding2) => finding2.severity === severity).length;
+      if (count === 0) continue;
+      const label = document.createElement("label");
+      label.className = "filter";
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.checked = visibleSeverities.has(severity);
+      box.onchange = () => {
+        if (box.checked) visibleSeverities.add(severity);
+        else visibleSeverities.delete(severity);
+        if (current) renderFindings(ignored.filter(current.findings));
+      };
+      const copy = document.createElement("span");
+      copy.textContent = `${text}\uFF08${count}\uFF09`;
+      label.append(box, copy);
+      container.appendChild(label);
+    }
+  }
   function renderFindings(findings) {
     const container = byId("findings");
     container.innerHTML = "";
-    const visible = findings.filter((f) => visibleCategories.has(f.category));
-    show("findings-section", findings.length > 0);
+    if (resultTab !== "open") {
+      show("findings-section", false);
+      return;
+    }
+    const visible = findings.filter(
+      (finding2) => visibleCategories.has(finding2.category) && visibleSeverities.has(finding2.severity)
+    );
+    byId("findings-title").textContent = "\u672A\u4FEE\u6B63";
+    show("findings-section", true);
     if (visible.length === 0) {
       const empty = document.createElement("p");
       empty.className = "lead";
-      empty.textContent = findings.length === 0 ? "\u6307\u6458\u306F\u3042\u308A\u307E\u305B\u3093\u3002" : "\u8868\u793A\u3059\u308B\u30AB\u30C6\u30B4\u30EA\u304C\u9078\u3070\u308C\u3066\u3044\u307E\u305B\u3093\u3002";
+      empty.textContent = findings.length === 0 ? "\u672A\u51E6\u7406\u306E\u6307\u6458\u306F\u3042\u308A\u307E\u305B\u3093\u3002" : "\u8868\u793A\u3059\u308B\u6761\u4EF6\u307E\u305F\u306F\u30AB\u30C6\u30B4\u30EA\u304C\u9078\u3070\u308C\u3066\u3044\u307E\u305B\u3093\u3002";
       container.appendChild(empty);
       return;
     }
     for (const [category, items] of groupByCategory(visible)) {
       const info = CATEGORIES[category];
       const group = document.createElement("details");
+      group.className = "category-group";
       group.open = true;
       const summary = document.createElement("summary");
       const swatch = document.createElement("span");
@@ -4088,25 +5305,47 @@
     quote.className = "finding-quote";
     const shown = items.slice(0, SAMPLE_LIMIT).map((f) => truncate(f.matched, 16));
     quote.textContent = shown.join(" / ") + (items.length > shown.length ? ` \u307B\u304B ${items.length - shown.length} \u4EF6` : "");
+    const range = document.createElement("span");
+    range.className = "page-range";
+    range.textContent = pageRange(items);
+    quote.appendChild(range);
     const buttons = document.createElement("div");
-    buttons.className = "row compact";
+    buttons.className = "rule-actions";
     const fixable = items.filter(canFix);
     if (fixable.length > 0) {
-      const label = fixable.length === items.length ? `\u307E\u3068\u3081\u3066\u4FEE\u6B63\uFF08${fixable.length} \u4EF6\uFF09` : `\u4FEE\u6B63\u3067\u304D\u308B ${fixable.length} \u4EF6\u3092\u307E\u3068\u3081\u3066\u4FEE\u6B63`;
+      const label = fixable.length === items.length ? `${fixable.length} \u4EF6\u3092\u307E\u3068\u3081\u3066\u4FEE\u6B63` : `\u4FEE\u6B63\u3067\u304D\u308B ${fixable.length} \u4EF6\u3092\u4FEE\u6B63`;
       buttons.appendChild(button(label, run(() => fixRule(ruleId)), "primary"));
     }
-    buttons.appendChild(
-      button("\u307E\u3068\u3081\u3066\u7121\u8996", () => {
-        for (const item of items) ignored.add(item);
-        renderReview();
-      })
-    );
     const details = document.createElement("details");
     details.className = "one-by-one";
     const summary = document.createElement("summary");
-    summary.textContent = `1 \u4EF6\u305A\u3064\u78BA\u8A8D\u3059\u308B\uFF08${items.length} \u4EF6\uFF09`;
+    summary.hidden = true;
+    summary.textContent = "\u500B\u5225\u306E\u6307\u6458";
     details.appendChild(summary);
     for (const item of items) details.appendChild(findingRow(item, false));
+    let firstOpen = true;
+    details.ontoggle = () => {
+      if (!details.open || !firstOpen) return;
+      firstOpen = false;
+      run(async () => {
+        const ok = await revealFinding(items[0], options());
+        setStatus(
+          ok ? `1/${items.length} \u4EF6\u76EE\uFF08${where(items[0].paragraphIndex)}\uFF09\u3092\u9078\u629E\u3057\u307E\u3057\u305F\u3002` : "\u8A72\u5F53\u7B87\u6240\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u518D\u5EA6\u30C1\u30A7\u30C3\u30AF\u3057\u3066\u304F\u3060\u3055\u3044\u3002"
+        );
+      })();
+    };
+    buttons.appendChild(
+      button("1 \u4EF6\u305A\u3064\u78BA\u8A8D", () => {
+        details.open = !details.open;
+      }, "review")
+    );
+    buttons.appendChild(
+      button("\u7121\u8996", () => {
+        ignored.addAll(items);
+        renderReview();
+      }, "ignore")
+    );
+    if (fixable.length === 0) buttons.classList.add("no-fix");
     group.append(head, quote, buttons, details);
     return group;
   }
@@ -4122,8 +5361,9 @@
     for (let pass = 0; pass < MAX_FIX_PASSES; pass += 1) {
       const target = selected().filter((f) => f.ruleId === ruleId && canFix(f));
       if (target.length === 0) break;
-      setStatus(`\u300C${name}\u300D\u3092 ${target.length} \u4EF6\u307E\u3068\u3081\u3066\u4FEE\u6B63\u3057\u3066\u3044\u307E\u3059\u2026`);
-      const { applied } = await applyFindings(target, options());
+      setStatus(`\u300C${name}\u300D\u3092 ${target.length} \u4EF6\u307E\u3068\u3081\u3066\u4FEE\u6B63\u3057\u3066\u3044\u307E\u3059\u2026`, true);
+      const { applied, appliedFindings } = await applyFindings(target, options());
+      rememberFixed(appliedFindings);
       total += applied;
       current = await reviewDocument(options());
       if (applied === 0) break;
@@ -4149,16 +5389,12 @@
       badge.textContent = titleFor(item.ruleId);
       head.appendChild(badge);
     }
-    const severity = document.createElement("span");
-    severity.className = "severity";
-    severity.textContent = { fix: "\u4FEE\u6B63", confirm: "\u78BA\u8A8D", note: "\u60C5\u5831" }[item.severity];
-    head.appendChild(severity);
     const message = document.createElement("p");
     message.className = "finding-message";
     message.textContent = item.message;
     const quote = document.createElement("p");
     quote.className = "finding-quote";
-    quote.textContent = `${item.paragraphIndex + 1}\u6BB5\u843D: ${truncate(item.matched, 60)}`;
+    quote.textContent = `${where(item.paragraphIndex)}: ${truncate(item.matched, 60)}`;
     const buttons = document.createElement("div");
     buttons.className = "row compact";
     buttons.appendChild(
@@ -4175,11 +5411,12 @@
         button(
           "\u4FEE\u6B63",
           run(async () => {
-            const { applied } = await applyFindings([item], options());
+            const { applied, appliedFindings } = await applyFindings([item], options());
             if (applied === 0) {
               setStatus("\u4FEE\u6B63\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u3082\u3046\u4E00\u5EA6\u30C1\u30A7\u30C3\u30AF\u3057\u3066\u304F\u3060\u3055\u3044\u3002");
               return;
             }
+            rememberFixed(appliedFindings);
             setStatus("\u4FEE\u6B63\u3057\u307E\u3057\u305F\u3002\u518D\u70B9\u691C\u3057\u307E\u3059\u2026");
             await runReview();
           }),
@@ -4187,6 +5424,25 @@
         )
       );
     }
+    buttons.appendChild(
+      button(
+        "\u30B3\u30E1\u30F3\u30C8",
+        run(async () => {
+          const n = await commentFindings([item], options());
+          setStatus(n > 0 ? "\u3053\u306E\u6307\u6458\u3092\u30B3\u30E1\u30F3\u30C8\u3068\u3057\u3066\u633F\u5165\u3057\u307E\u3057\u305F\u3002" : "\u8A72\u5F53\u7B87\u6240\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002");
+        })
+      )
+    );
+    buttons.appendChild(
+      button(
+        "\u30DE\u30FC\u30AB\u30FC",
+        run(async () => {
+          const n = await highlightFindings([item], options());
+          if (n > 0) remember([item]);
+          setStatus(n > 0 ? "\u3053\u306E\u6307\u6458\u3092\u30DE\u30FC\u30AB\u30FC\u3067\u5857\u308A\u307E\u3057\u305F\u3002" : "\u8A72\u5F53\u7B87\u6240\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002");
+        })
+      )
+    );
     buttons.appendChild(
       button("\u7121\u8996", () => {
         ignored.add(item);
@@ -4203,7 +5459,14 @@
     const container = byId("ignored");
     container.innerHTML = "";
     const items = ignored.entries();
-    show("ignored-section", items.length > 0);
+    show("ignored-section", resultTab === "ignored");
+    if (items.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "lead";
+      empty.textContent = "\u7121\u8996\u3057\u305F\u9805\u76EE\u306F\u3042\u308A\u307E\u305B\u3093\u3002";
+      container.appendChild(empty);
+      return;
+    }
     for (const { key, finding: finding2 } of items) {
       const row = document.createElement("div");
       row.className = "finding ignored";
@@ -4215,7 +5478,7 @@
       head.appendChild(badge);
       const quote = document.createElement("p");
       quote.className = "finding-quote";
-      quote.textContent = `${finding2.paragraphIndex + 1}\u6BB5\u843D: ${truncate(finding2.matched, 60)}`;
+      quote.textContent = `${where(finding2.paragraphIndex)}: ${truncate(finding2.matched, 60)}`;
       const buttons = document.createElement("div");
       buttons.className = "row compact";
       buttons.appendChild(
@@ -4228,22 +5491,41 @@
       container.appendChild(row);
     }
   }
-  function renderFonts(inventory) {
-    const list = byId("font-report");
-    list.innerHTML = "";
-    const hasContent = inventory.entries.length > 0 || inventory.mismatches.length > 0;
-    show("fonts-section", hasContent);
-    if (!hasContent) return;
-    for (const message of inventory.mismatches) {
-      const li = document.createElement("li");
-      li.className = "mismatch";
-      li.textContent = message;
-      list.appendChild(li);
+  function rememberFixed(findings) {
+    var _a;
+    for (const finding2 of findings) {
+      fixedRecords.push({
+        finding: finding2,
+        before: finding2.matched,
+        after: (_a = finding2.replacement) != null ? _a : "\u66F8\u5F0F\u3092\u4FEE\u6B63"
+      });
     }
-    for (const entry of inventory.entries) {
-      const li = document.createElement("li");
-      li.textContent = `${entry.font} \u2014 ${entry.paragraphs} \u6BB5\u843D\uFF08\u4F8B: ${entry.sample}\uFF09`;
-      list.appendChild(li);
+  }
+  function renderFixed() {
+    const container = byId("fixed");
+    container.innerHTML = "";
+    show("fixed-section", resultTab === "fixed");
+    if (fixedRecords.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "lead";
+      empty.textContent = "\u3053\u306E\u30BB\u30C3\u30B7\u30E7\u30F3\u3067\u9069\u7528\u3057\u305F\u4FEE\u6B63\u306F\u3042\u308A\u307E\u305B\u3093\u3002";
+      container.appendChild(empty);
+      return;
+    }
+    for (const record of [...fixedRecords].reverse()) {
+      const row = document.createElement("div");
+      row.className = "finding fixed";
+      const head = document.createElement("div");
+      head.className = "finding-head";
+      const badge = document.createElement("span");
+      badge.className = "badge";
+      badge.textContent = titleFor(record.finding.ruleId);
+      head.appendChild(badge);
+      const quote = document.createElement("p");
+      quote.className = "finding-quote";
+      quote.textContent = `${where(record.finding.paragraphIndex)}\u30FB\u6587\u5B57 ${record.finding.start + 1}\u2013${record.finding.end}\uFF1A${truncate(record.before, 36)} \u2192 ${truncate(record.after, 36)}`;
+      row.append(head, quote);
+      container.appendChild(row);
     }
   }
   function selected() {
@@ -4275,38 +5557,54 @@
       setStatus("\u30B3\u30E1\u30F3\u30C8\u306B\u3059\u308B\u6307\u6458\u304C\u3042\u308A\u307E\u305B\u3093\u3002");
       return;
     }
-    setStatus("\u30B3\u30E1\u30F3\u30C8\u3092\u633F\u5165\u3057\u3066\u3044\u307E\u3059\u2026");
+    setStatus("\u30B3\u30E1\u30F3\u30C8\u3092\u633F\u5165\u3057\u3066\u3044\u307E\u3059\u2026", true);
     const n = await commentFindings(target, options());
     setStatus(
       `${n} \u4EF6\u3092\u30B3\u30E1\u30F3\u30C8\u3068\u3057\u3066\u633F\u5165\u3057\u307E\u3057\u305F\u3002\u8FD4\u4FE1\u3084\u89E3\u6C7A\u306F Word \u306E\u6821\u95B2\u6A5F\u80FD\u3067\u884C\u3048\u307E\u3059\u3002\u7247\u4ED8\u3051\u306F\uFF3B\u30A2\u30C9\u30A4\u30F3\u306E\u30B3\u30E1\u30F3\u30C8\u524A\u9664\uFF3D\u3002`
     );
   }
   async function clearComments2() {
-    setStatus("\u3053\u306E\u30A2\u30C9\u30A4\u30F3\u304C\u633F\u5165\u3057\u305F\u30B3\u30E1\u30F3\u30C8\u3092\u524A\u9664\u3057\u3066\u3044\u307E\u3059\u2026");
+    setStatus("\u3053\u306E\u30A2\u30C9\u30A4\u30F3\u304C\u633F\u5165\u3057\u305F\u30B3\u30E1\u30F3\u30C8\u3092\u524A\u9664\u3057\u3066\u3044\u307E\u3059\u2026", true);
     const n = await clearComments(options());
     setStatus(
       n === 0 ? "\u3053\u306E\u30A2\u30C9\u30A4\u30F3\u304C\u633F\u5165\u3057\u305F\u30B3\u30E1\u30F3\u30C8\u306F\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\uFF08\u307B\u304B\u306E\u4EBA\u306E\u30B3\u30E1\u30F3\u30C8\u306F\u524A\u9664\u3057\u307E\u305B\u3093\uFF09\u3002" : `${n} \u4EF6\u306E\u30B3\u30E1\u30F3\u30C8\u3092\u524A\u9664\u3057\u307E\u3057\u305F\uFF08\u3082\u3068\u304B\u3089\u3042\u3063\u305F\u30B3\u30E1\u30F3\u30C8\u306F\u6B8B\u3057\u3066\u3044\u307E\u3059\uFF09\u3002`
     );
   }
   async function clearAllComments2() {
-    setStatus("\u6587\u66F8\u306E\u30B3\u30E1\u30F3\u30C8\u3092\u3059\u3079\u3066\u524A\u9664\u3057\u3066\u3044\u307E\u3059\u2026");
+    setStatus("\u6587\u66F8\u306E\u30B3\u30E1\u30F3\u30C8\u3092\u3059\u3079\u3066\u524A\u9664\u3057\u3066\u3044\u307E\u3059\u2026", true);
     const n = await clearAllComments(options());
     setStatus(
       n === 0 ? "\u30B3\u30E1\u30F3\u30C8\u306F\u3042\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002" : `${n} \u4EF6\u306E\u30B3\u30E1\u30F3\u30C8\u3092\u3059\u3079\u3066\u524A\u9664\u3057\u307E\u3057\u305F\uFF08\u307B\u304B\u306E\u4EBA\u306E\u30B3\u30E1\u30F3\u30C8\u3082\u542B\u307F\u307E\u3059\u3002\u5143\u306B\u623B\u3059\u306E\u306F \u2318Z\uFF09\u3002`
     );
   }
   async function clearAllHighlights2() {
-    setStatus("\u6587\u66F8\u306E\u30CF\u30A4\u30E9\u30A4\u30C8\u3092\u3059\u3079\u3066\u6D88\u53BB\u3057\u3066\u3044\u307E\u3059\u2026");
+    setStatus("\u6587\u66F8\u306E\u30CF\u30A4\u30E9\u30A4\u30C8\u3092\u3059\u3079\u3066\u6D88\u53BB\u3057\u3066\u3044\u307E\u3059\u2026", true);
     await clearAllHighlights(options());
     painted = [];
     paintedSpaces = false;
+    paintedFonts.clear();
+    paintedCharacterStyles.clear();
+    paintedCompoundLabels.clear();
+    paintedReferenceMarkers.clear();
+    paintedReferenceNumbers.clear();
     setStatus("\u6587\u66F8\u306E\u30CF\u30A4\u30E9\u30A4\u30C8\u3092\u3059\u3079\u3066\u6D88\u53BB\u3057\u307E\u3057\u305F\uFF08\u624B\u3067\u5857\u3063\u305F\u30DE\u30FC\u30AB\u30FC\u3082\u542B\u307F\u307E\u3059\u3002\u5143\u306B\u623B\u3059\u306E\u306F \u2318Z\uFF09\u3002");
   }
-  var jumpCursor = /* @__PURE__ */ new Map();
   var pageOf = /* @__PURE__ */ new Map();
   function where(paragraphIndex) {
     const page = pageOf.get(paragraphIndex);
     return page === void 0 ? `${paragraphIndex + 1}\u6BB5\u843D` : `${page}\u30DA\u30FC\u30B8 ${paragraphIndex + 1}\u6BB5\u843D`;
+  }
+  function pageRange(items) {
+    const pages = [...new Set(items.map((item) => pageOf.get(item.paragraphIndex)).filter(
+      (page) => page !== void 0
+    ))].sort((a, b) => a - b);
+    if (pages.length === 0) {
+      const paragraphs = items.map((item) => item.paragraphIndex + 1).sort((a, b) => a - b);
+      return `\u7B2C ${paragraphs[0]}\u2013${paragraphs.at(-1)} \u6BB5\u843D\u306B\u51FA\u73FE`;
+    }
+    const first = pages[0];
+    const last = pages.at(-1);
+    return `p. ${first}${first === last ? "" : `\u2013${last}`} \u306B\u51FA\u73FE\uFF08${pages.length} \u30DA\u30FC\u30B8\uFF09`;
   }
   async function reveal(label, occurrence, index, total) {
     const ok = await revealSpan(
@@ -4317,37 +5615,39 @@
       ok ? `\u300C${label}\u300D${index + 1}/${total} \u4EF6\u76EE\uFF08${where(occurrence.paragraphIndex)}\uFF09\u3092\u9078\u629E\u3057\u307E\u3057\u305F\u3002` : "\u8A72\u5F53\u7B87\u6240\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u6587\u66F8\u304C\u5909\u308F\u3063\u3066\u3044\u308B\u5834\u5408\u306F\u4E00\u89A7\u3092\u4F5C\u308A\u76F4\u3057\u3066\u304F\u3060\u3055\u3044\u3002"
     );
   }
-  function jumpTo(key, label, occurrences2) {
-    return run(async () => {
-      var _a;
-      if (occurrences2.length === 0) return;
-      const at = ((_a = jumpCursor.get(key)) != null ? _a : 0) % occurrences2.length;
-      jumpCursor.set(key, at + 1);
-      await reveal(label, occurrences2[at], at, occurrences2.length);
-    });
-  }
-  var PLACES_SHOWN = 8;
-  function placesRow(label, occurrences2) {
+  function placesRow(label, occurrences2, onChoose) {
     const row = document.createElement("p");
     row.className = "finding-quote places";
-    occurrences2.slice(0, PLACES_SHOWN).forEach((occurrence, i) => {
-      if (i > 0) row.appendChild(document.createTextNode(" / "));
+    occurrences2.forEach((occurrence, i) => {
       const place = document.createElement("button");
       place.type = "button";
       place.className = "place";
       place.textContent = where(occurrence.paragraphIndex);
       place.title = `${label} \u306E ${i + 1} \u4EF6\u76EE\u3078\u79FB\u52D5`;
-      place.onclick = run(() => reveal(label, occurrence, i, occurrences2.length));
+      place.onclick = run(async () => {
+        onChoose == null ? void 0 : onChoose();
+        await reveal(label, occurrence, i, occurrences2.length);
+      });
       row.appendChild(place);
     });
-    if (occurrences2.length > PLACES_SHOWN) {
-      row.appendChild(document.createTextNode(` \u307B\u304B ${occurrences2.length - PLACES_SHOWN} \u4EF6`));
-    }
     return row;
   }
   function renderCompounds(items) {
+    var _a;
     const container = byId("compounds");
     container.innerHTML = "";
+    const highlightSelect = byId("compound-highlight-select");
+    const previousHighlight = highlightSelect.value;
+    highlightSelect.innerHTML = "";
+    for (const item of items) {
+      const option = document.createElement("option");
+      option.value = item.label;
+      option.textContent = `${item.label}\uFF08${item.occurrences.length} \u4EF6\uFF09`;
+      highlightSelect.appendChild(option);
+    }
+    if ([...highlightSelect.options].some((option) => option.value === previousHighlight)) {
+      highlightSelect.value = previousHighlight;
+    }
     if (items.length === 0) {
       const empty = document.createElement("p");
       empty.className = "lead";
@@ -4356,100 +5656,462 @@
       return;
     }
     for (const item of items) {
-      const row = document.createElement("div");
-      row.className = `finding ${item.occurrences.length === 1 ? "severity-confirm" : "severity-note"}`;
-      const head = document.createElement("div");
-      head.className = "finding-head";
-      const label = document.createElement("button");
-      label.type = "button";
-      label.className = "inventory-label badge";
+      const row = document.createElement("details");
+      row.className = "compound-item";
+      const head = document.createElement("summary");
+      const toggle = document.createElement("span");
+      toggle.className = "compound-toggle";
+      const label = document.createElement("strong");
+      label.className = "compound-label";
       label.textContent = item.label;
-      label.onclick = jumpTo(`compounds:${item.label}`, item.label, item.occurrences);
       const count = document.createElement("span");
-      count.className = "severity";
+      count.className = "compound-count";
       count.textContent = `${item.occurrences.length} \u4EF6`;
-      head.append(label, count);
-      row.append(head, placesRow(item.label, item.occurrences));
+      const meta = document.createElement("span");
+      meta.className = "compound-meta";
+      meta.append(label, count);
+      const thumbnail = document.createElement("img");
+      thumbnail.className = "compound-thumbnail";
+      thumbnail.dataset.compoundLabel = item.label;
+      thumbnail.alt = `\u5316\u5408\u7269 ${item.label} \u306E\u767B\u9332\u753B\u50CF`;
+      const image = (_a = compoundNotes.get(item.label)) == null ? void 0 : _a.image;
+      thumbnail.src = image != null ? image : "";
+      thumbnail.hidden = image === void 0;
+      row.classList.toggle("has-thumbnail", image !== void 0);
+      toggle.append(thumbnail, meta);
+      head.append(toggle);
+      const detail = document.createElement("div");
+      detail.className = "compound-detail";
+      const locations = document.createElement("section");
+      locations.className = "compound-detail-section";
+      const locationsHeading = document.createElement("p");
+      locationsHeading.className = "compound-detail-heading";
+      locationsHeading.textContent = "\u51FA\u73FE\u7B87\u6240";
+      locations.append(locationsHeading, placesRow(item.label, item.occurrences));
+      detail.append(locations, compoundNoteEditor(item.label));
+      row.append(head, detail);
+      row.addEventListener("toggle", () => {
+        if (!row.open) return;
+        for (const other of container.querySelectorAll(".compound-item[open]")) {
+          if (other !== row) other.open = false;
+        }
+      });
       container.appendChild(row);
     }
   }
-  function renderReferences(report) {
-    const container = byId("references");
+  function renderFigures(items) {
+    const container = byId("figures");
     container.innerHTML = "";
-    if (report.references.length === 0) {
+    if (items.length === 0) {
       const empty = document.createElement("p");
       empty.className = "lead";
-      empty.textContent = "\u6587\u732E\u756A\u53F7\u306F\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002";
+      empty.textContent = "Figure\u3001Fig.\u3001Table\u3001\u56F3\u3001\u8868\u306E\u756A\u53F7\u306F\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002";
       container.appendChild(empty);
       return;
     }
+    for (const item of items) {
+      const row = document.createElement("details");
+      row.className = "compound-item";
+      const head = document.createElement("summary");
+      const toggle = document.createElement("span");
+      toggle.className = "compound-toggle";
+      const label = document.createElement("strong");
+      label.className = "compound-label";
+      label.textContent = item.label;
+      const count = document.createElement("span");
+      count.className = "compound-count";
+      count.textContent = `\u30AD\u30E3\u30D7\u30B7\u30E7\u30F3 ${item.captions.length} \u4EF6\uFF0F\u672C\u6587 ${item.references.length} \u4EF6`;
+      const meta = document.createElement("span");
+      meta.className = "compound-meta";
+      meta.append(label, count);
+      toggle.append(meta);
+      head.append(toggle);
+      row.appendChild(head);
+      const detail = document.createElement("div");
+      detail.className = "compound-detail";
+      if (item.captions.length > 0) {
+        const captions = document.createElement("section");
+        captions.className = "compound-detail-section";
+        const title = document.createElement("p");
+        title.className = "compound-detail-heading";
+        title.textContent = "\u30AD\u30E3\u30D7\u30B7\u30E7\u30F3";
+        captions.append(title, placesRow(item.label, item.captions));
+        detail.appendChild(captions);
+      }
+      if (item.references.length > 0) {
+        const references = document.createElement("section");
+        references.className = "compound-detail-section";
+        const title = document.createElement("p");
+        title.className = "compound-detail-heading";
+        title.textContent = "\u672C\u6587\u4E2D\u306E\u53C2\u7167";
+        references.append(title, placesRow(item.label, item.references));
+        detail.appendChild(references);
+      }
+      row.appendChild(detail);
+      container.appendChild(row);
+    }
+  }
+  function selectReference(number) {
+    selectedReferenceNumber = number;
+    if (lastLabels) renderReferences(lastLabels);
+  }
+  async function jumpToSelectedReference() {
+    const item = lastLabels == null ? void 0 : lastLabels.references.find((reference) => reference.number === (selectedReferenceNumber != null ? selectedReferenceNumber : 1));
+    if (!(item == null ? void 0 : item.entry)) {
+      setStatus("\u6587\u732E [1] \u304C\u6587\u732E\u30EA\u30B9\u30C8\u306B\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002\u6587\u732E\u30AB\u30FC\u30C9\u3092\u9078\u3093\u3067\u304F\u3060\u3055\u3044\u3002");
+      return;
+    }
+    setStatus("\u672C\u6587\u4E2D\u306E\u6587\u732E\u30EA\u30B9\u30C8\u3078\u79FB\u52D5\u3057\u3066\u3044\u307E\u3059\u2026", true);
+    const ok = await revealBibliographyEntry(item.entry.at.text, item.entry.full);
+    setStatus(
+      ok ? `\u672C\u6587\u4E2D\u306E\u6587\u732E\u30EA\u30B9\u30C8\uFF08${where(item.entry.at.paragraphIndex)}\uFF09\u3078\u79FB\u52D5\u3057\u307E\u3057\u305F\u3002` : "\u6587\u732E\u30EA\u30B9\u30C8\u306E\u9805\u76EE\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u4E00\u89A7\u3092\u4F5C\u308A\u76F4\u3057\u3066\u304F\u3060\u3055\u3044\u3002"
+    );
+  }
+  function authorEnd(text) {
+    const yearAt = text.search(/(?:19|20)\d{2}\s*,\s*\d+/u);
+    if (yearAt < 0) return null;
+    const head = text.slice(0, yearAt);
+    const etAl = /\bet\s+al\.?\s*/iu.exec(head);
+    if (etAl) return etAl.index + etAl[0].length;
+    const at = Math.max(head.lastIndexOf(","), head.lastIndexOf(";"));
+    if (at < 0) return null;
+    let end = at + 1;
+    if (head.includes(",")) {
+      const trailingInitial = /^\s*[A-Z]\.\s+(?=[A-Z])/u.exec(head.slice(end));
+      if (trailingInitial) end += trailingInitial[0].length;
+    }
+    return end;
+  }
+  var FIRST_AUTHOR2 = /^([A-Z][A-Za-z'’-]+(?:,\s*[A-Z]\.(?:\s*[A-Z]\.)*)?|(?:[A-Z]\.\s*)+[A-Z][A-Za-z'’-]+)/u;
+  var REFERENCE_LINK = /(https?:\/\/[^\s<>]+|\bdoi:\s*(10\.\d{4,9}\/[\w.()/:;-]+)|\b(10\.\d{4,9}\/[\w.()/:;-]+))/giu;
+  function appendLinkedText(parent, text) {
+    var _a, _b;
+    let from = 0;
+    for (const match of text.matchAll(REFERENCE_LINK)) {
+      const at = (_a = match.index) != null ? _a : 0;
+      parent.append(document.createTextNode(text.slice(from, at)));
+      const displayed = match[0];
+      const doi = (_b = match[2]) != null ? _b : match[3];
+      const link = document.createElement("a");
+      link.href = doi ? `https://doi.org/${doi}` : displayed;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = displayed;
+      link.title = doi ? "DOI \u3092\u958B\u304F" : "URL \u3092\u958B\u304F";
+      parent.append(link);
+      from = at + displayed.length;
+    }
+    parent.append(document.createTextNode(text.slice(from)));
+  }
+  function appendReferenceText(parent, entry, authors) {
+    var _a;
+    const candidateEnd = authors === "short" ? authorEnd(entry.full) : null;
+    const end = candidateEnd !== null && !/\bet\s+al\.?\s*$/iu.test(entry.full.slice(0, candidateEnd)) ? candidateEnd : null;
+    const first = (_a = FIRST_AUTHOR2.exec(entry.full)) == null ? void 0 : _a[1];
+    if (end !== null && first) {
+      appendLinkedText(parent, `${first} et al. `);
+    }
+    let offset = 0;
+    for (const run2 of entry.formatting) {
+      const runStart = offset;
+      offset += run2.text.length;
+      const start = end === null ? 0 : Math.max(0, end - runStart);
+      if (start >= run2.text.length) continue;
+      const styled = document.createElement("span");
+      styled.className = `${run2.bold ? "reference-bold " : ""}${run2.italic ? "reference-italic" : ""}`.trim();
+      appendLinkedText(styled, run2.text.slice(start));
+      parent.append(styled);
+    }
+  }
+  function stringField(source, key) {
+    if (source === null || typeof source !== "object") return void 0;
+    const value = source[key];
+    return typeof value === "string" && value.trim().length > 0 ? value.trim() : void 0;
+  }
+  function firstStringField(source, key) {
+    if (source === null || typeof source !== "object") return void 0;
+    const value = source[key];
+    return Array.isArray(value) && typeof value[0] === "string" && value[0].trim().length > 0 ? value[0].trim() : void 0;
+  }
+  async function lookupCrossref(entry) {
+    const endpoint = new URL("https://api.crossref.org/works");
+    endpoint.searchParams.set("query.bibliographic", entry.full.slice(0, 700));
+    endpoint.searchParams.set("rows", "1");
+    endpoint.searchParams.set("select", "DOI,title,URL");
+    const response = await fetch(endpoint.toString(), { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error(`Crossref: ${response.status}`);
+    const payload = await response.json();
+    const message = payload !== null && typeof payload === "object" ? payload.message : void 0;
+    const items = message !== null && typeof message === "object" ? message.items : void 0;
+    const item = Array.isArray(items) ? items[0] : void 0;
+    const doi = stringField(item, "DOI");
+    const title = firstStringField(item, "title");
+    const url = stringField(item, "URL");
+    return doi || title || url ? { state: "found", doi, title, url } : { state: "not-found" };
+  }
+  function crossrefEnabled() {
+    return byId("crossref-enabled").checked;
+  }
+  async function enrichReferences(report) {
+    if (!crossrefEnabled()) return;
+    const entries = [...new Map(report.references.flatMap((item) => item.entry ? [[item.entry.full, item.entry]] : [])).values()];
+    const pending = entries.filter((entry) => !crossrefMetadata.has(entry.full));
+    if (pending.length === 0) return;
+    crossrefProgress = { completed: 0, total: pending.length };
+    for (const entry of pending) crossrefMetadata.set(entry.full, { state: "loading" });
+    renderReferences(report);
+    const queue = [...pending];
+    const worker = async () => {
+      for (; ; ) {
+        const entry = queue.shift();
+        if (!entry) return;
+        try {
+          crossrefMetadata.set(entry.full, await lookupCrossref(entry));
+        } catch {
+          crossrefMetadata.set(entry.full, { state: "failed" });
+        }
+        if (crossrefProgress) crossrefProgress = { ...crossrefProgress, completed: crossrefProgress.completed + 1 };
+        if (lastLabels === report) renderReferences(report);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(3, pending.length) }, () => worker()));
+    crossrefProgress = null;
+    if (lastLabels === report) renderReferences(report);
+  }
+  function externalLink(url, label) {
+    const link = document.createElement("a");
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = label;
+    return link;
+  }
+  function crossrefDetails(entry) {
+    if (!crossrefEnabled()) return null;
+    const metadata = crossrefMetadata.get(entry.full);
+    if (!metadata || metadata.state === "not-found" || metadata.state === "failed") return null;
+    const details = document.createElement("div");
+    details.className = "crossref-details";
+    if (metadata.state === "loading") {
+      details.textContent = "Crossref \u304B\u3089\u30BF\u30A4\u30C8\u30EB\u30FBDOI\u3092\u691C\u7D22\u4E2D\u2026";
+      return details;
+    }
+    const label = document.createElement("span");
+    label.className = "crossref-label";
+    label.textContent = "Crossref\u5019\u88DC";
+    details.appendChild(label);
+    if (metadata.title) {
+      const title = document.createElement("span");
+      title.className = "crossref-title";
+      title.textContent = metadata.title;
+      details.appendChild(title);
+    }
+    if (metadata.doi) details.append(externalLink(`https://doi.org/${metadata.doi}`, `DOI: ${metadata.doi}`));
+    const normalizedDoiUrl = metadata.doi ? `https://doi.org/${metadata.doi}`.toLowerCase() : "";
+    if (metadata.url && metadata.url.toLowerCase() !== normalizedDoiUrl) details.append(externalLink(metadata.url, "\u51FA\u7248\u793E\u30DA\u30FC\u30B8"));
+    return details;
+  }
+  function renderReferences(report) {
+    const container = byId("references");
+    const highlightSelect = byId("reference-highlight-select");
+    const previousHighlight = highlightSelect.value;
+    highlightSelect.innerHTML = "";
     for (const item of report.references) {
+      const option = document.createElement("option");
+      option.value = String(item.number);
+      option.textContent = `[${item.number}]\uFF08${item.citations.length} \u56DE\uFF09`;
+      highlightSelect.appendChild(option);
+    }
+    if ([...highlightSelect.options].some((option) => option.value === previousHighlight)) {
+      highlightSelect.value = previousHighlight;
+    }
+    const search = byId("reference-search").value.trim().toLocaleLowerCase();
+    const filter = byId("reference-filter").value;
+    const authors = byId("reference-authors").value;
+    const selected2 = report.references.find((item) => item.number === selectedReferenceNumber);
+    const target = selected2 != null ? selected2 : report.references.find((item) => item.number === 1);
+    const crossrefStatus = byId("crossref-status");
+    const jump = byId("reference-list-jump");
+    jump.disabled = (target == null ? void 0 : target.entry) === void 0;
+    jump.title = (target == null ? void 0 : target.entry) ? `[${target.number}] \u306E\u6587\u732E\u30EA\u30B9\u30C8\uFF08${where(target.entry.at.paragraphIndex)}\uFF09\u3078\u79FB\u52D5` : "\u6587\u732E [1] \u304C\u306A\u3044\u305F\u3081\u3001\u6587\u732E\u30AB\u30FC\u30C9\u3092\u9078\u3093\u3067\u304F\u3060\u3055\u3044\u3002";
+    if (!crossrefEnabled()) {
+      crossrefStatus.hidden = true;
+    } else if (crossrefProgress) {
+      crossrefStatus.hidden = false;
+      crossrefStatus.textContent = `Crossref \u3092\u691C\u7D22\u4E2D\u2026 ${crossrefProgress.completed}/${crossrefProgress.total} \u4EF6`;
+    } else {
+      crossrefStatus.hidden = false;
+      const found = report.references.filter((item) => {
+        var _a;
+        return item.entry && ((_a = crossrefMetadata.get(item.entry.full)) == null ? void 0 : _a.state) === "found";
+      }).length;
+      crossrefStatus.textContent = `Crossref\u691C\u7D22\u304C\u5B8C\u4E86\u3057\u307E\u3057\u305F\u3002${found} \u4EF6\u306E\u5019\u88DC\u3092\u53D6\u5F97\u3057\u307E\u3057\u305F\u3002`;
+    }
+    container.innerHTML = "";
+    const items = report.references.filter((item) => {
+      var _a, _b;
+      const issue = item.entry === void 0 || item.citations.length === 0;
+      const matchesFilter = filter === "issues" ? issue : filter === "uncited" ? item.citations.length === 0 : true;
+      const haystack = `[${item.number}] ${(_b = (_a = item.entry) == null ? void 0 : _a.full) != null ? _b : ""}`.toLocaleLowerCase();
+      return matchesFilter && (search.length === 0 || haystack.includes(search));
+    });
+    if (items.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "lead";
+      empty.textContent = report.references.length === 0 ? "\u5F15\u7528\u6587\u732E\u306F\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002" : "\u6761\u4EF6\u306B\u5408\u3046\u5F15\u7528\u6587\u732E\u306F\u3042\u308A\u307E\u305B\u3093\u3002";
+      container.appendChild(empty);
+      return;
+    }
+    for (const item of items) {
       const missing = item.entry === void 0;
       const uncited = item.citations.length === 0;
-      const row = document.createElement("div");
-      row.className = `finding ${missing || uncited ? "severity-fix" : "severity-note"}`;
+      const row = document.createElement("article");
+      row.className = `finding reference-item ${missing || uncited ? "severity-fix" : "severity-note"}`;
+      row.classList.toggle("selected", item.number === selectedReferenceNumber);
+      row.title = "\u30AB\u30FC\u30C9\u306E\u7A7A\u3044\u3066\u3044\u308B\u90E8\u5206\u3092\u62BC\u3059\u3068\u3001\u3053\u306E\u6587\u732E\u3092\u9078\u629E\u3057\u307E\u3059\u3002";
+      row.onclick = (event) => {
+        if (event.target.closest("button, a, input, select, label")) return;
+        selectReference(item.number);
+      };
       const head = document.createElement("div");
       head.className = "finding-head";
-      const label = document.createElement("button");
-      label.type = "button";
+      const label = document.createElement("span");
       label.className = "inventory-label badge";
       label.textContent = `[${item.number}]`;
-      label.onclick = jumpTo(`references:${item.number}`, `[${item.number}]`, item.citations);
       const count = document.createElement("span");
       count.className = "severity";
       count.textContent = uncited ? "\u672C\u6587\u306B\u5F15\u7528\u306A\u3057" : `${item.citations.length} \u56DE`;
       head.append(label, count);
       row.appendChild(head);
       if (item.entry) {
-        const summary = document.createElement("p");
-        summary.className = "finding-message reference-entry";
-        summary.textContent = item.entry.summary;
-        summary.title = item.entry.full;
-        row.appendChild(summary);
-        const jump = document.createElement("div");
-        jump.className = "row compact";
-        const target = item.entry.at;
-        jump.appendChild(
-          button(`\u6587\u732E\u30EA\u30B9\u30C8\u3078\uFF08${where(target.paragraphIndex)}\uFF09`, run(
-            () => reveal(`[${item.number}] \u306E\u6587\u732E`, target, 0, 1)
-          ))
-        );
-        row.appendChild(jump);
+        const citation = document.createElement("p");
+        citation.className = "finding-message reference-entry";
+        citation.title = item.entry.full;
+        appendReferenceText(citation, item.entry, authors);
+        row.append(citation);
+        const details = crossrefDetails(item.entry);
+        if (details) row.appendChild(details);
       } else {
         const warning = document.createElement("p");
         warning.className = "finding-message";
         warning.textContent = report.hasBibliography ? "\u6587\u732E\u30EA\u30B9\u30C8\u306B\u8A72\u5F53\u3059\u308B\u9805\u76EE\u304C\u3042\u308A\u307E\u305B\u3093\u3002" : "\u6587\u732E\u30EA\u30B9\u30C8\u304C\u898B\u3064\u304B\u3089\u306A\u3044\u305F\u3081\u3001\u66F8\u8A8C\u306F\u8868\u793A\u3067\u304D\u307E\u305B\u3093\u3002";
         row.appendChild(warning);
       }
-      if (item.citations.length > 0) {
-        row.appendChild(placesRow(`[${item.number}]`, item.citations));
-      }
+      if (item.citations.length > 0) row.appendChild(placesRow(`[${item.number}]`, item.citations, () => selectReference(item.number)));
       container.appendChild(row);
     }
   }
   async function loadPages(paragraphIndices) {
     pageOf = await paragraphPages([...new Set(paragraphIndices)], options());
   }
+  function positiveNumber(id) {
+    const value = Number(byId(id).value);
+    if (!Number.isInteger(value) || value < 1) throw new Error("1 \u4EE5\u4E0A\u306E\u6574\u6570\u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044\u3002");
+    return value;
+  }
+  function numberInUse(kind, number) {
+    if (!lastLabels) return false;
+    if (kind === "references") return lastLabels.references.some((item) => item.number === number);
+    return lastLabels.compounds.some((item) => {
+      var _a;
+      return Number((_a = /^(\d+)/u.exec(item.label)) == null ? void 0 : _a[1]) === number;
+    });
+  }
+  function compoundLabelEdit() {
+    const from = byId("compound-from").value.trim();
+    const to = byId("compound-to").value.trim();
+    if (!/^\d{1,4}[a-z]?$/iu.test(from) || !/^\d{1,4}[a-z]?$/iu.test(to)) {
+      throw new Error("\u5316\u5408\u7269\u756A\u53F7\u306F 1\u30011a \u306E\u3088\u3046\u306B\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044\u3002");
+    }
+    return { mode: "replace-label", from: from.toLowerCase(), to: to.toLowerCase() };
+  }
+  function compoundLabelInUse(label) {
+    var _a;
+    return (_a = lastLabels == null ? void 0 : lastLabels.compounds.some((item) => item.label.toLowerCase() === label.toLowerCase())) != null ? _a : false;
+  }
+  function migrateCompoundNotes(edit) {
+    const moved = /* @__PURE__ */ new Map();
+    for (const [label, note] of compoundNotes) {
+      moved.set(editedCompoundNumberText(label, edit), note);
+    }
+    compoundNotes.clear();
+    for (const [label, note] of moved) compoundNotes.set(label, note);
+    persistCompoundNotes();
+  }
+  function invalidateReview() {
+    current = null;
+    reviewedPages = null;
+    show("start-section", true);
+    show("result-summary", false);
+    show("summary-section", false);
+    show("findings-section", false);
+    show("fixed-section", false);
+    show("ignored-section", false);
+  }
+  async function editNumbers(kind, edit) {
+    if (kind === "compounds" && edit.mode === "replace-label") {
+      if (edit.from === edit.to) {
+        setStatus("\u5909\u66F4\u524D\u3068\u5909\u66F4\u5F8C\u304C\u540C\u3058\u756A\u53F7\u3067\u3059\u3002");
+        return;
+      }
+      if (!compoundLabelInUse(edit.from)) {
+        setStatus(`\u5316\u5408\u7269 ${edit.from} \u306F\u4E00\u89A7\u306B\u3042\u308A\u307E\u305B\u3093\u3002`);
+        return;
+      }
+      if (compoundLabelInUse(edit.to)) {
+        setStatus(`\u5316\u5408\u7269 ${edit.to} \u306F\u3059\u3067\u306B\u4F7F\u308F\u308C\u3066\u3044\u307E\u3059\u3002`);
+        return;
+      }
+    } else if (edit.mode === "replace") {
+      if (edit.from === edit.to) {
+        setStatus("\u5909\u66F4\u524D\u3068\u5909\u66F4\u5F8C\u304C\u540C\u3058\u756A\u53F7\u3067\u3059\u3002");
+        return;
+      }
+      if (!numberInUse(kind, edit.from)) {
+        setStatus(`\u756A\u53F7 ${edit.from} \u306F\u4E00\u89A7\u306B\u3042\u308A\u307E\u305B\u3093\u3002`);
+        return;
+      }
+      if (numberInUse(kind, edit.to)) {
+        setStatus(`\u756A\u53F7 ${edit.to} \u306F\u3059\u3067\u306B\u4F7F\u308F\u308C\u3066\u3044\u307E\u3059\u3002`);
+        return;
+      }
+    }
+    const name = kind === "compounds" ? "\u5316\u5408\u7269\u756A\u53F7" : "\u6587\u732E\u756A\u53F7";
+    setStatus(`${name}\u3092\u672C\u6587\u5168\u4F53\u3067\u5909\u66F4\u3057\u3066\u3044\u307E\u3059\u2026`, true);
+    const changed = kind === "compounds" ? await editCompoundNumbers(edit, options()) : await editReferenceNumbers(edit, options());
+    if (changed === 0) {
+      setStatus("\u5909\u66F4\u5BFE\u8C61\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u4E00\u89A7\u3092\u4F5C\u308A\u76F4\u3057\u3066\u304F\u3060\u3055\u3044\u3002");
+      return;
+    }
+    if (kind === "compounds") migrateCompoundNotes(edit);
+    invalidateReview();
+    if (kind === "compounds") await listCompounds();
+    else await listReferences();
+    setStatus(`${name}\u3092 ${changed} \u7B87\u6240\u5909\u66F4\u3057\u307E\u3057\u305F\u3002\u53D6\u308A\u6D88\u3057\u306F \u2318Z\uFF08Ctrl+Z\uFF09\u3067\u3059\u3002`);
+  }
   async function listCompounds() {
-    setStatus("\u5316\u5408\u7269\u756A\u53F7\u3092\u96C6\u3081\u3066\u3044\u307E\u3059\u2026");
+    setStatus("\u5316\u5408\u7269\u3092\u96C6\u3081\u3066\u3044\u307E\u3059\u2026");
     showView("compounds");
-    const { compounds } = await listLabels(options());
+    const report = await listLabels(options());
+    lastLabels = report;
+    const { compounds } = report;
     await loadPages(compounds.flatMap((item) => item.occurrences.map((o) => o.paragraphIndex)));
     renderCompounds(compounds);
-    const once = compounds.filter((item) => item.occurrences.length === 1).length;
     setStatus(
-      compounds.length === 0 ? "\u5316\u5408\u7269\u756A\u53F7\u306F\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002" : `${compounds.length} \u7A2E\u985E\u306E\u5316\u5408\u7269\u756A\u53F7\u3002${once > 0 ? `\u3046\u3061 ${once} \u7A2E\u985E\u306F 1 \u56DE\u3057\u304B\u51FA\u3066\u304D\u307E\u305B\u3093\u3002` : ""}`
+      compounds.length === 0 ? "\u5316\u5408\u7269\u306F\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002" : `${compounds.length} \u7A2E\u985E\u306E\u5316\u5408\u7269\u3092\u691C\u51FA\u3057\u307E\u3057\u305F\u3002`
     );
   }
   async function listReferences() {
     setStatus("\u6587\u732E\u756A\u53F7\u3092\u96C6\u3081\u3066\u3044\u307E\u3059\u2026");
     showView("references");
     const report = await listLabels(options());
+    lastLabels = report;
     await loadPages([
       ...report.references.flatMap((item) => item.citations.map((o) => o.paragraphIndex)),
       ...report.references.flatMap((item) => item.entry ? [item.entry.at.paragraphIndex] : [])
     ]);
     renderReferences(report);
+    void enrichReferences(report);
     const notes = [];
     if (!report.hasBibliography) notes.push("\u672B\u5C3E\u306E\u6587\u732E\u30EA\u30B9\u30C8\u306F\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F");
     if (report.missingEntries.length > 0) {
@@ -4459,6 +6121,18 @@
     setStatus(
       report.references.length === 0 ? "\u6587\u732E\u756A\u53F7\u306F\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002" : `${report.references.length} \u4EF6\u306E\u6587\u732E\u756A\u53F7\u3002${notes.length > 0 ? notes.join("\uFF0F") + "\u3002" : "\u5BFE\u5FDC\u306B\u6F0F\u308C\u306F\u3042\u308A\u307E\u305B\u3093\u3002"}`
     );
+  }
+  async function listFigures() {
+    setStatus("\u56F3\u30FB\u8868\u756A\u53F7\u3092\u96C6\u3081\u3066\u3044\u307E\u3059\u2026");
+    showView("figures");
+    const report = await listFigureTables(options());
+    await loadPages(report.items.flatMap((item) => [
+      ...item.captions.map((occurrence) => occurrence.paragraphIndex),
+      ...item.references.map((occurrence) => occurrence.paragraphIndex)
+    ]));
+    renderFigures(report.items);
+    const mentions = report.items.reduce((total, item) => total + item.captions.length + item.references.length, 0);
+    setStatus(report.items.length === 0 ? "\u56F3\u30FB\u8868\u756A\u53F7\u306F\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002" : `${report.items.length} \u7A2E\u985E\u30FB${mentions} \u7B87\u6240\u306E\u56F3\u30FB\u8868\u756A\u53F7\u3092\u691C\u51FA\u3057\u307E\u3057\u305F\u3002`);
   }
   var DEFAULT_FONT_TARGET = "Times New Roman";
   var COMMON_FONTS = [
@@ -4473,12 +6147,77 @@
     "Hiragino Mincho ProN",
     "Hiragino Kaku Gothic ProN"
   ];
+  function setUpHighlightColorPicker(prefix, selected2, select) {
+    const button2 = byId(`${prefix}-color`);
+    const name = byId(`${prefix}-color-name`);
+    const menu = byId(`${prefix}-color-menu`);
+    const picker = byId(`${prefix}-picker`);
+    menu.innerHTML = "";
+    const close = () => {
+      menu.hidden = true;
+      button2.setAttribute("aria-expanded", "false");
+    };
+    const update = () => {
+      var _a;
+      const value = selected2();
+      const color = HIGHLIGHT_PALETTE.find((item) => item.value === value);
+      button2.style.setProperty("--selected-color", value);
+      name.textContent = (_a = color == null ? void 0 : color.label) != null ? _a : "\u8272\u3092\u9078\u629E";
+      for (const option of menu.querySelectorAll("button")) {
+        option.setAttribute("aria-selected", String(option.dataset.color === value));
+      }
+    };
+    for (const color of HIGHLIGHT_PALETTE) {
+      const option = document.createElement("button");
+      option.type = "button";
+      option.className = "font-color-option";
+      option.dataset.color = color.value;
+      option.setAttribute("role", "option");
+      option.innerHTML = `<span class="color-swatch" style="--selected-color: ${color.value}" aria-hidden="true"></span><span>${color.label}</span>`;
+      option.onclick = () => {
+        select(color.value);
+        update();
+        close();
+      };
+      menu.appendChild(option);
+    }
+    button2.onclick = () => {
+      const willOpen = menu.hidden;
+      menu.hidden = !willOpen;
+      button2.setAttribute("aria-expanded", String(willOpen));
+    };
+    picker.addEventListener("focusout", () => {
+      window.setTimeout(() => {
+        if (!picker.contains(document.activeElement)) close();
+      }, 0);
+    });
+    update();
+  }
   async function replaceFonts(note) {
     if (note === void 0) setStatus("\u4F7F\u308F\u308C\u3066\u3044\u308B\u30D5\u30A9\u30F3\u30C8\u3092\u8ABF\u3079\u3066\u3044\u307E\u3059\u2026");
     showView("fonts");
     const usages = await listFonts(options());
+    const styleUsages = await listCharacterStyles(options());
     const container = byId("font-usage");
+    const summary = byId("font-summary");
+    const replaceFrom = byId("font-replace-from");
+    const replaceTo = byId("font-replace-to");
+    const highlightSelect = byId("font-highlight-select");
+    const styleSummary = byId("style-summary");
+    const styleUsage = byId("style-usage");
+    const styleReplaceFrom = byId("style-replace-from");
+    const styleReplaceTo = byId("style-replace-to");
+    const styleHighlightSelect = byId("style-highlight-select");
     container.innerHTML = "";
+    summary.textContent = "";
+    replaceFrom.innerHTML = "";
+    replaceTo.innerHTML = "";
+    highlightSelect.innerHTML = "";
+    styleSummary.textContent = "";
+    styleUsage.innerHTML = "";
+    styleReplaceFrom.innerHTML = "";
+    styleReplaceTo.innerHTML = "";
+    styleHighlightSelect.innerHTML = "";
     if (usages.length === 0) {
       const empty = document.createElement("p");
       empty.className = "lead";
@@ -4489,66 +6228,233 @@
     }
     const targets = [
       .../* @__PURE__ */ new Set([DEFAULT_FONT_TARGET, ...usages.map((usage) => usage.name), ...COMMON_FONTS, prefs.bodyFont])
-    ];
+    ].filter((font) => font.length > 0);
+    const totalCharacters = usages.reduce((total, usage) => total + usage.characters, 0);
+    summary.textContent = `${usages.length} \u7A2E\u985E\u30FB\u5408\u8A08 ${totalCharacters.toLocaleString()} \u6587\u5B57\uFF08\u7A7A\u767D\u3092\u9664\u304F\uFF09`;
     for (const usage of usages) {
-      const row = document.createElement("div");
-      row.className = "finding severity-note";
-      const head = document.createElement("div");
-      head.className = "finding-head";
-      const badge = document.createElement("span");
-      badge.className = "badge";
-      badge.textContent = usage.name;
-      const count = document.createElement("span");
-      count.className = "severity";
-      count.textContent = `${usage.ranges} \u7B87\u6240${usage.japanese ? "\u30FB\u548C\u6587" : ""}`;
-      head.append(badge, count);
-      const sample = document.createElement("p");
-      sample.className = "finding-quote";
-      sample.textContent = usage.sample ? `\u4F8B: ${truncate(usage.sample, 30)}` : "";
-      const controls = document.createElement("div");
-      controls.className = "row compact";
-      const select = document.createElement("select");
+      const option = document.createElement("option");
+      option.value = usage.name;
+      option.textContent = usage.name;
+      replaceFrom.appendChild(option.cloneNode(true));
+      highlightSelect.appendChild(option);
+    }
+    const populateReplaceTargets = () => {
+      const previous = replaceTo.value;
+      replaceTo.innerHTML = "";
       for (const target of targets) {
-        if (target === usage.name) continue;
+        if (target === replaceFrom.value) continue;
         const option = document.createElement("option");
         option.value = target;
         option.textContent = target;
-        select.appendChild(option);
+        replaceTo.appendChild(option);
       }
-      const apply = button(
-        "\u7F6E\u63DB",
-        run(async () => {
-          const to = select.value;
-          if (!to) return;
-          setStatus(`\u300C${usage.name}\u300D\u3092\u300C${to}\u300D\u306B\u7F6E\u63DB\u3057\u3066\u3044\u307E\u3059\u2026`);
-          const n = await replaceFontEverywhere(usage.name, to, options());
-          if (n === 0) {
-            setStatus(`\u300C${usage.name}\u300D\u306E\u7B87\u6240\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u4E00\u89A7\u3092\u4F5C\u308A\u76F4\u3057\u3066\u304F\u3060\u3055\u3044\u3002`);
-            return;
-          }
-          await replaceFonts(`\u300C${usage.name}\u300D\u306E ${n} \u7B87\u6240\u3092\u300C${to}\u300D\u306B\u7F6E\u63DB\u3057\u307E\u3057\u305F\uFF08\u53D6\u308A\u6D88\u3057\u306F \u2318Z\uFF09\u3002`);
-        }),
-        "primary"
-      );
-      controls.append(select, apply);
-      row.append(head, sample, controls);
+      if ([...replaceTo.options].some((option) => option.value === previous)) replaceTo.value = previous;
+    };
+    replaceFrom.onchange = populateReplaceTargets;
+    populateReplaceTargets();
+    setUpHighlightColorPicker("font-highlight", () => selectedFontHighlightColor, (color) => {
+      selectedFontHighlightColor = color;
+    });
+    setUpHighlightColorPicker("style-highlight", () => selectedStyleHighlightColor, (color) => {
+      selectedStyleHighlightColor = color;
+    });
+    for (const usage of usages) {
+      const row = document.createElement("article");
+      row.className = "font-stat";
+      const name = document.createElement("strong");
+      name.textContent = usage.name;
+      const kind = document.createElement("span");
+      kind.className = "font-kind";
+      kind.textContent = usage.japanese ? "\u548C\u6587\u30D5\u30A9\u30F3\u30C8" : "\u6B27\u6587\u30D5\u30A9\u30F3\u30C8";
+      const facts = document.createElement("span");
+      facts.className = "font-facts";
+      facts.textContent = `${usage.ranges} \u7B87\u6240\u30FB${usage.characters.toLocaleString()} \u6587\u5B57`;
+      const sample = document.createElement("p");
+      sample.className = "font-sample";
+      sample.textContent = usage.name.toLowerCase() === "symbol" ? "\u30AE\u30EA\u30B7\u30E3\u6587\u5B57\u306A\u3069\u306B\u4F7F\u7528" : usage.sample ? `\u4F8B: ${truncate(usage.sample, 30)}` : "";
+      row.append(name, kind, facts, sample);
       container.appendChild(row);
     }
-    setStatus(note != null ? note : `${usages.length} \u7A2E\u985E\u306E\u30D5\u30A9\u30F3\u30C8\u304C\u4F7F\u308F\u308C\u3066\u3044\u307E\u3059\u3002`);
+    if (styleUsages.length === 0) {
+      styleSummary.textContent = "\u592A\u5B57\u30FB\u659C\u4F53\u30FB\u4E0A\u4ED8\u304D\u30FB\u4E0B\u4ED8\u304D\u306E\u6587\u5B57\u306F\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002";
+    } else {
+      const total = styleUsages.reduce((count, usage) => count + usage.characters, 0);
+      styleSummary.textContent = `${styleUsages.length} \u7A2E\u985E\u30FB\u5408\u8A08 ${total.toLocaleString()} \u6587\u5B57`;
+      for (const usage of styleUsages) {
+        const item = document.createElement("span");
+        item.className = "style-stat";
+        item.innerHTML = `<strong>${usage.label}</strong>${usage.characters.toLocaleString()} \u6587\u5B57`;
+        styleUsage.appendChild(item);
+        const option = document.createElement("option");
+        option.value = usage.style;
+        option.textContent = `${usage.label}\uFF08${usage.characters.toLocaleString()} \u6587\u5B57\uFF09`;
+        styleReplaceFrom.appendChild(option.cloneNode(true));
+        styleHighlightSelect.appendChild(option);
+      }
+    }
+    const populateStyleTargets = () => {
+      const source = styleReplaceFrom.value;
+      styleReplaceTo.innerHTML = "";
+      const normal = document.createElement("option");
+      normal.value = "normal";
+      normal.textContent = "\u901A\u5E38\uFF08\u88C5\u98FE\u306A\u3057\uFF09";
+      styleReplaceTo.appendChild(normal);
+      for (const style of CHARACTER_STYLES) {
+        if (style.style === source) continue;
+        const option = document.createElement("option");
+        option.value = style.style;
+        option.textContent = style.label;
+        styleReplaceTo.appendChild(option);
+      }
+    };
+    styleReplaceFrom.onchange = populateStyleTargets;
+    populateStyleTargets();
+    if (note !== void 0) setStatus(note);
+  }
+  async function replaceSelectedFont() {
+    const from = byId("font-replace-from").value;
+    const to = byId("font-replace-to").value;
+    if (!from || !to || from === to) {
+      setStatus("\u7570\u306A\u308B\u5143\u306E\u30D5\u30A9\u30F3\u30C8\u3068\u7F6E\u63DB\u5148\u3092\u9078\u3093\u3067\u304F\u3060\u3055\u3044\u3002");
+      return;
+    }
+    setStatus(`\u300C${from}\u300D\u3092\u300C${to}\u300D\u306B\u7F6E\u63DB\u3057\u3066\u3044\u307E\u3059\u2026`, true);
+    const n = await replaceFontEverywhere(from, to, options());
+    if (n === 0) {
+      setStatus(`\u300C${from}\u300D\u306E\u7B87\u6240\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u4E00\u89A7\u3092\u4F5C\u308A\u76F4\u3057\u3066\u304F\u3060\u3055\u3044\u3002`);
+      return;
+    }
+    await replaceFonts(`\u300C${from}\u300D\u306E ${n} \u7B87\u6240\u3092\u300C${to}\u300D\u306B\u7F6E\u63DB\u3057\u307E\u3057\u305F\uFF08\u53D6\u308A\u6D88\u3057\u306F \u2318Z\uFF09\u3002`);
+  }
+  async function highlightSelectedFont() {
+    var _a;
+    const select = byId("font-highlight-select");
+    const color = selectedFontHighlightColor;
+    const name = select.value;
+    if (!name || !color) {
+      setStatus("\u5148\u306B\uFF3B\u30D5\u30A9\u30F3\u30C8\uFF3D\u3092\u958B\u3044\u3066\u66F8\u4F53\u3092\u9078\u3093\u3067\u304F\u3060\u3055\u3044\u3002");
+      return;
+    }
+    setStatus(`\u300C${name}\u300D\u3092\u5F37\u8ABF\u3057\u3066\u3044\u307E\u3059\u2026`, true);
+    const n = await highlightFontEverywhere(name, color, options());
+    if (n > 0) {
+      const colors = (_a = paintedFonts.get(name)) != null ? _a : /* @__PURE__ */ new Set();
+      colors.add(color);
+      paintedFonts.set(name, colors);
+    }
+    setStatus(
+      n > 0 ? `\u300C${name}\u300D\u306E ${n} \u7B87\u6240\u3092\u5F37\u8ABF\u3057\u307E\u3057\u305F\u3002\u7247\u4ED8\u3051\u306F\uFF3B\u30A2\u30C9\u30A4\u30F3\u306E\u5857\u308A\u3092\u524A\u9664\uFF3D\u3002` : `\u300C${name}\u300D\u306E\u7B87\u6240\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u4E00\u89A7\u3092\u4F5C\u308A\u76F4\u3057\u3066\u304F\u3060\u3055\u3044\u3002`
+    );
+  }
+  async function highlightSelectedCompoundLabel() {
+    var _a;
+    const label = byId("compound-highlight-select").value;
+    if (!label) {
+      setStatus("\u5148\u306B\uFF3B\u5316\u5408\u7269\uFF3D\u3092\u958B\u3044\u3066\u756A\u53F7\u3092\u9078\u3093\u3067\u304F\u3060\u3055\u3044\u3002");
+      return;
+    }
+    setStatus(`\u5316\u5408\u7269 ${label} \u3092\u5F37\u8ABF\u3057\u3066\u3044\u307E\u3059\u2026`, true);
+    const n = await highlightCompoundLabelEverywhere(label, selectedCompoundHighlightColor, options());
+    if (n > 0) {
+      const colors = (_a = paintedCompoundLabels.get(label)) != null ? _a : /* @__PURE__ */ new Set();
+      colors.add(selectedCompoundHighlightColor);
+      paintedCompoundLabels.set(label, colors);
+    }
+    setStatus(
+      n > 0 ? `\u5316\u5408\u7269 ${label} \u306E ${n} \u7B87\u6240\u3092\u5F37\u8ABF\u3057\u307E\u3057\u305F\u3002\u7247\u4ED8\u3051\u306F\uFF3B\u30A2\u30C9\u30A4\u30F3\u306E\u5857\u308A\u3092\u524A\u9664\uFF3D\u3002` : `\u5316\u5408\u7269 ${label} \u306E\u7B87\u6240\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u4E00\u89A7\u3092\u4F5C\u308A\u76F4\u3057\u3066\u304F\u3060\u3055\u3044\u3002`
+    );
+  }
+  async function highlightSelectedReferenceNumber() {
+    var _a;
+    const number = Number(byId("reference-highlight-select").value);
+    const numberOnly = byId("reference-highlight-number-only").checked;
+    if (!Number.isInteger(number) || number < 1) {
+      setStatus("\u5148\u306B\uFF3B\u6587\u732E\uFF3D\u3092\u958B\u3044\u3066\u756A\u53F7\u3092\u9078\u3093\u3067\u304F\u3060\u3055\u3044\u3002");
+      return;
+    }
+    setStatus(`\u6587\u732E [${number}] \u3092\u5F37\u8ABF\u3057\u3066\u3044\u307E\u3059\u2026`, true);
+    const n = await highlightReferenceNumberEverywhere(number, selectedReferenceHighlightColor, numberOnly, options());
+    if (n > 0) {
+      const painted2 = numberOnly ? paintedReferenceNumbers : paintedReferenceMarkers;
+      const colors = (_a = painted2.get(number)) != null ? _a : /* @__PURE__ */ new Set();
+      colors.add(selectedReferenceHighlightColor);
+      painted2.set(number, colors);
+    }
+    setStatus(
+      n > 0 ? `\u6587\u732E [${number}] \u306E ${n} \u7B87\u6240\u3092${numberOnly ? "\u756A\u53F7\u3060\u3051" : "\u5F15\u7528\u8A18\u53F7\u3054\u3068"}\u5F37\u8ABF\u3057\u307E\u3057\u305F\u3002\u7247\u4ED8\u3051\u306F\uFF3B\u30A2\u30C9\u30A4\u30F3\u306E\u5857\u308A\u3092\u524A\u9664\uFF3D\u3002` : `\u6587\u732E [${number}] \u306E\u672C\u6587\u4E2D\u306E\u5F15\u7528\u306F\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002`
+    );
+  }
+  async function replaceSelectedCharacterStyle() {
+    var _a, _b;
+    const from = byId("style-replace-from").value;
+    const to = byId("style-replace-to").value;
+    const fromLabel = (_a = CHARACTER_STYLES.find((style) => style.style === from)) == null ? void 0 : _a.label;
+    const toLabel = to === "normal" ? "\u901A\u5E38\u306E\u6587\u5B57" : (_b = CHARACTER_STYLES.find((style) => style.style === to)) == null ? void 0 : _b.label;
+    if (!from || !to || from === to || !fromLabel || !toLabel) {
+      setStatus("\u7570\u306A\u308B\u5143\u306E\u66F8\u4F53\u3068\u7F6E\u63DB\u5148\u3092\u9078\u3093\u3067\u304F\u3060\u3055\u3044\u3002");
+      return;
+    }
+    setStatus(`${fromLabel}\u3092${toLabel}\u3078\u7F6E\u63DB\u3057\u3066\u3044\u307E\u3059\u2026`, true);
+    const n = await replaceCharacterStyleEverywhere(from, to, options());
+    if (n === 0) {
+      setStatus(`${fromLabel}\u306E\u6587\u5B57\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u4E00\u89A7\u3092\u4F5C\u308A\u76F4\u3057\u3066\u304F\u3060\u3055\u3044\u3002`);
+      return;
+    }
+    await replaceFonts(`${fromLabel}\u306E ${n} \u6587\u5B57\u3092${toLabel}\u306B\u7F6E\u63DB\u3057\u307E\u3057\u305F\uFF08\u53D6\u308A\u6D88\u3057\u306F \u2318Z\uFF09\u3002`);
+  }
+  async function highlightSelectedCharacterStyle() {
+    var _a, _b;
+    const style = byId("style-highlight-select").value;
+    const label = (_a = CHARACTER_STYLES.find((item) => item.style === style)) == null ? void 0 : _a.label;
+    if (!style || !label) {
+      setStatus("\u5148\u306B\uFF3B\u6587\u5B57\uFF3D\u3092\u958B\u3044\u3066\u66F8\u4F53\u3092\u9078\u3093\u3067\u304F\u3060\u3055\u3044\u3002");
+      return;
+    }
+    setStatus(`${label}\u3092\u5F37\u8ABF\u3057\u3066\u3044\u307E\u3059\u2026`, true);
+    const n = await highlightCharacterStyleEverywhere(style, selectedStyleHighlightColor, options());
+    if (n > 0) {
+      const colors = (_b = paintedCharacterStyles.get(style)) != null ? _b : /* @__PURE__ */ new Set();
+      colors.add(selectedStyleHighlightColor);
+      paintedCharacterStyles.set(style, colors);
+    }
+    setStatus(
+      n > 0 ? `${label}\u306E ${n} \u6587\u5B57\u3092\u5F37\u8ABF\u3057\u307E\u3057\u305F\u3002\u7247\u4ED8\u3051\u306F\uFF3B\u30A2\u30C9\u30A4\u30F3\u306E\u5857\u308A\u3092\u524A\u9664\uFF3D\u3002` : `${label}\u306E\u6587\u5B57\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u4E00\u89A7\u3092\u4F5C\u308A\u76F4\u3057\u3066\u304F\u3060\u3055\u3044\u3002`
+    );
+  }
+  async function highlightSpaces() {
+    setStatus("\u30B9\u30DA\u30FC\u30B9\u3092\u5F37\u8ABF\u3057\u3066\u3044\u307E\u3059\u2026", true);
+    const n = await highlightAllSpaces({
+      ...options(),
+      halfSpaceColor: selectedHalfSpaceColor,
+      fullSpaceColor: selectedFullSpaceColor
+    });
+    paintedSpaces = true;
+    setStatus(`${n} \u7B87\u6240\u306E\u30B9\u30DA\u30FC\u30B9\u3092\u5857\u308A\u307E\u3057\u305F\u3002\u7247\u4ED8\u3051\u306F\uFF3B\u30A2\u30C9\u30A4\u30F3\u306E\u5857\u308A\u3092\u524A\u9664\uFF3D\u3002`);
   }
   function remember(findings) {
     const seen = new Set(painted.map(ignoreKey));
     painted = [...painted, ...findings.filter((f) => !seen.has(ignoreKey(f)))];
   }
   async function clearHighlights2() {
-    setStatus("\u3053\u306E\u30A2\u30C9\u30A4\u30F3\u304C\u5857\u3063\u305F\u7B87\u6240\u3092\u6D88\u53BB\u4E2D\u2026");
+    setStatus("\u3053\u306E\u30A2\u30C9\u30A4\u30F3\u304C\u5857\u3063\u305F\u7B87\u6240\u3092\u6D88\u53BB\u4E2D\u2026", true);
     const blind = painted.length === 0;
-    const n = await clearHighlights(options(), {
+    const findingCount = await clearHighlights(options(), {
       findings: blind ? selected() : painted,
       spaces: paintedSpaces || blind
     });
+    const fontCount = await clearFontHighlightsEverywhere(paintedFonts, options());
+    const styleCount = await clearCharacterStyleHighlightsEverywhere(paintedCharacterStyles, options());
+    const compoundCount = await clearCompoundLabelHighlightsEverywhere(paintedCompoundLabels, options());
+    const referenceMarkerCount = await clearReferenceNumberHighlightsEverywhere(paintedReferenceMarkers, false, options());
+    const referenceNumberCount = await clearReferenceNumberHighlightsEverywhere(paintedReferenceNumbers, true, options());
+    const n = findingCount + fontCount + styleCount + compoundCount + referenceMarkerCount + referenceNumberCount;
     painted = [];
     paintedSpaces = false;
+    paintedFonts.clear();
+    paintedCharacterStyles.clear();
+    paintedCompoundLabels.clear();
+    paintedReferenceMarkers.clear();
+    paintedReferenceNumbers.clear();
     setStatus(
       n === 0 ? "\u6D88\u305B\u308B\u30CF\u30A4\u30E9\u30A4\u30C8\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u624B\u3067\u5857\u3063\u305F\u30DE\u30FC\u30AB\u30FC\u3054\u3068\u6D88\u3059\u306B\u306F\u3001\u30EA\u30DC\u30F3\u306E\uFF3B\u30CF\u30A4\u30E9\u30A4\u30C8\u3092\u5168\u3066\u524A\u9664\uFF3D\u3092\u4F7F\u3063\u3066\u304F\u3060\u3055\u3044\u3002" : `${n} \u7B87\u6240\u306E\u30CF\u30A4\u30E9\u30A4\u30C8\u3092\u6D88\u53BB\u3057\u307E\u3057\u305F\uFF08\u624B\u3067\u5857\u3063\u305F\u30DE\u30FC\u30AB\u30FC\u306F\u6B8B\u3057\u3066\u3044\u307E\u3059\uFF09\u3002`
     );

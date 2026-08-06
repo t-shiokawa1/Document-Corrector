@@ -4,12 +4,23 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Document Corrector</title>
-    <link rel="stylesheet" href="taskpane.css" />
+    <!-- Word caches files referenced by taskpane.html separately from the manifest. -->
+    <link rel="stylesheet" href="taskpane.css?v=1.16.0.24" />
     <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-    <script defer src="taskpane.js"></script>
+    <script defer src="taskpane.js?v=1.16.0.24"></script>
   </head>
   <body>
-    <main>
+    <main class="taskpane">
+      <!-- List views put the return action before their title, so the next move
+           is available immediately without making the title compete with it. -->
+      <div id="view-nav" class="row compact" hidden>
+        <button id="back-to-review" type="button">← 指摘一覧に戻る</button>
+      </div>
+      <header id="panel-head" class="panel-head">
+        <h1 id="panel-title">点検結果</h1>
+        <button id="reference-list-jump" class="panel-reference-jump" type="button" hidden disabled>本文中の文献リストへ</button>
+        <p id="status" class="status">読み込み中…</p>
+      </header>
       <!-- Shown only when the installed manifest is older than the published one.
            Rule updates arrive on their own and say nothing; this appears when the
            ribbon itself has changed and the manifest has to be re-installed. -->
@@ -23,68 +34,336 @@
         <p id="update-url" class="update-url" hidden></p>
       </section>
 
-      <p id="status" class="status">読み込み中…</p>
-
-      <!-- Shown only outside 指摘一覧: the ribbon put the pane in a list view,
-           and this is the way back without hunting for the right button. -->
-      <div id="view-nav" class="row compact" hidden>
-        <button id="back-to-review" type="button">← 指摘一覧に戻る</button>
-      </div>
-
       <div id="view-review">
+        <!-- 点検前だけ出る案内。ボタンが 15 個並んでいるところに放り出されると、
+             初見では最初の一手が決まらない（実機での指摘）。 -->
+        <section id="start-section">
+          <h2>はじめに</h2>
+          <p class="lead">
+            リボンの<strong>［文書をチェック］</strong>を押すと点検が始まり、指摘がここに並びます。
+            1 ページあたり数秒かかります。
+          </p>
+          <div class="row compact">
+            <button id="open-help" type="button" class="primary">使い方をひらく</button>
+          </div>
+        </section>
+
+        <section id="result-summary" hidden>
+          <div class="result-grid" aria-label="点検結果の状態">
+            <button type="button" class="result-card" data-result-tab="open" aria-pressed="true">
+              <strong id="result-open-count">0</strong><span>未修正</span>
+            </button>
+            <button type="button" class="result-card" data-result-tab="fixed">
+              <strong id="result-fixed-count">0</strong><span>修正済み</span>
+            </button>
+            <button type="button" class="result-card" data-result-tab="ignored">
+              <strong id="result-ignored-count">0</strong><span>無視した項目</span>
+            </button>
+          </div>
+        </section>
+
         <section id="summary-section" hidden>
-          <h2>カテゴリ</h2>
-          <p class="lead">チェックを外すと一覧から隠れます（色はチェックリストのマーカーに対応）。</p>
-          <div id="category-filters" class="filters"></div>
+          <details class="filter-panel" open>
+            <summary>絞り込み</summary>
+            <p class="lead">表示したい条件だけを選べます。</p>
+            <div class="filter-set">
+              <span class="filter-label">対応のしかた</span>
+              <div id="condition-filters" class="filters filters-inline"></div>
+            </div>
+            <div class="filter-set">
+              <span class="filter-label">カテゴリ</span>
+              <div id="category-filters" class="filters"></div>
+            </div>
+          </details>
         </section>
 
         <section id="findings-section" hidden>
-          <h2>指摘一覧</h2>
+          <h2 id="findings-title">未修正</h2>
           <div id="findings"></div>
+        </section>
+
+        <section id="fixed-section" hidden>
+          <h2>修正済み</h2>
+          <p class="lead">この Word セッションで適用した修正です。</p>
+          <div id="fixed"></div>
         </section>
 
         <section id="ignored-section" hidden>
           <h2>無視した指摘</h2>
-          <p class="lead">パネルを閉じるまで保持されます。［戻す］で一覧に復帰します。</p>
+          <p class="lead">
+            原稿ファイルに保存され、次に開いたときも無視のままです。［戻す］で一覧に復帰します。
+          </p>
           <div class="row compact">
             <button id="restore-all" type="button">すべて戻す</button>
           </div>
           <div id="ignored"></div>
         </section>
-
-        <section id="fonts-section" hidden>
-          <h2>フォント関係</h2>
-          <ul id="font-report"></ul>
-        </section>
       </div>
 
       <div id="view-compounds" hidden>
-        <h2>化合物番号</h2>
-        <p class="lead">
-          本文に出てくる番号と、その回数、そして出てくる場所です。番号をクリックすると
-          該当箇所へ順に移動します。<strong>太字の番号</strong>を化合物とみなし、
-          Figure・Table などに続く番号は除きます。「化合物 5」のように語を伴うものと、
-          系列ラベル（5a、1a–f）も数えます。
-        </p>
-        <div id="compounds"></div>
+        <details class="compound-section" open>
+          <summary><span>化合物一覧</span><span class="section-help" role="img" tabindex="0" aria-label="化合物一覧の説明" data-tooltip="本文に出てくる番号と、その回数を一覧します。番号を開くと出てくる場所を確認でき、ページ・段落のボタンで該当箇所へ移動します。太字の番号、「化合物 5」のように語を伴うもの、系列ラベル（5a、1a–f）を数えます。Figure・Table などに続く番号は除きます。">?</span></summary>
+          <div id="compounds"></div>
+        </details>
+        <details class="compound-section">
+          <summary><span>化合物番号を強調</span><span class="section-help" role="img" tabindex="0" aria-label="化合物番号を強調の説明" data-tooltip="選んだ化合物番号だけを、選んだ色で本文中にマーカー表示します。">?</span></summary>
+          <div class="font-controls font-highlight-controls compound-highlight-controls">
+            <label class="font-field">化合物番号<span class="font-select"><select id="compound-highlight-select"></select></span></label>
+            <div class="font-field">
+              <span>色</span>
+              <div id="compound-highlight-picker" class="font-color-picker">
+                <button id="compound-highlight-color" type="button" class="font-color-button" aria-haspopup="listbox" aria-expanded="false">
+                  <span class="color-swatch" aria-hidden="true"></span>
+                  <span id="compound-highlight-color-name">シアン</span>
+                </button>
+                <div id="compound-highlight-color-menu" class="font-color-menu" role="listbox" aria-label="強調する色" hidden></div>
+              </div>
+            </div>
+            <button id="compound-highlight" type="button" class="primary">本文で強調</button>
+          </div>
+        </details>
+        <details class="compound-section">
+          <summary><span>番号を途中に挿入</span><span class="section-help" role="img" tabindex="0" aria-label="番号を途中に挿入の説明" data-tooltip="指定した番号以降の化合物番号を、本文全体で 1 つ繰り下げます。">?</span></summary>
+          <div class="number-controls">
+            <input id="compound-insert-number" type="number" min="1" value="6" aria-label="挿入する化合物番号" />
+            <button id="compound-insert" type="button" class="primary">挿入して以降をずらす</button>
+          </div>
+        </details>
+        <details class="compound-section">
+          <summary><span>番号を一括変更</span><span class="section-help" role="img" tabindex="0" aria-label="番号を一括変更の説明" data-tooltip="番号または系列ラベルを指定して置き換えます。例：1 → 1a">?</span></summary>
+          <div class="number-controls two">
+            <input id="compound-from" type="text" value="5" inputmode="text" aria-label="変更前の化合物番号" />
+            <span aria-hidden="true">→</span>
+            <input id="compound-to" type="text" value="6" inputmode="text" aria-label="変更後の化合物番号" />
+            <button id="compound-replace" type="button">一括変更</button>
+          </div>
+        </details>
       </div>
 
       <div id="view-references" hidden>
-        <h2>文献番号</h2>
-        <p class="lead">
-          本文が引用している番号と、末尾の文献リストから拾った書誌です。番号をクリックすると
-          引用箇所へ順に移動します。書誌の欠けている番号と、引用されていない文献には印が付きます。
-        </p>
-        <div id="references"></div>
+        <details class="compound-section" open>
+          <summary><span>引用文献一覧</span><span class="section-help" role="img" tabindex="0" aria-label="引用文献一覧の説明" data-tooltip="本文の引用と末尾の文献リストを照合します。カードの空いている部分を押して文献を選び、ページ・段落で本文の引用箇所へ移動します。文献リストへはボタンから移動できます。">?</span></summary>
+          <details class="compound-section reference-filter-section">
+            <summary><span>検索・絞り込み</span><span class="section-help" role="img" tabindex="0" aria-label="検索・絞り込みの説明" data-tooltip="番号・著者・年で検索し、問題または未引用の文献だけに絞り込めます。Crossref検索を有効にすると、外部データベースからタイトル・DOI・URLの候補を取得します。">?</span></summary>
+            <div class="reference-controls" aria-label="引用文献の表示設定">
+              <label class="reference-search">検索<input id="reference-search" type="search" placeholder="番号・著者・年" aria-label="引用文献を検索" /></label>
+              <label>表示<select id="reference-filter" aria-label="引用文献の絞り込み"><option value="all">すべて</option><option value="issues">問題のみ</option><option value="uncited">未引用のみ</option></select></label>
+              <label>著者<select id="reference-authors" aria-label="著者の表示方法"><option value="short">先頭著者のみ</option><option value="all">全員</option></select></label>
+              <label class="crossref-enable"><input id="crossref-enabled" type="checkbox" /> Crossref検索を有効にする</label>
+              <p id="crossref-status" class="crossref-status" aria-live="polite" hidden></p>
+            </div>
+          </details>
+          <div id="references"></div>
+        </details>
+        <details class="compound-section">
+          <summary><span>文献番号を強調</span><span class="section-help" role="img" tabindex="0" aria-label="文献番号を強調の説明" data-tooltip="選んだ文献番号だけを、選んだ色で本文中にマーカー表示します。">?</span></summary>
+          <div class="font-controls font-highlight-controls compound-highlight-controls">
+            <label class="font-field">文献番号<span class="font-select"><select id="reference-highlight-select"></select></span></label>
+            <div class="font-field">
+              <span>色</span>
+              <div id="reference-highlight-picker" class="font-color-picker">
+                <button id="reference-highlight-color" type="button" class="font-color-button" aria-haspopup="listbox" aria-expanded="false">
+                  <span class="color-swatch" aria-hidden="true"></span>
+                  <span id="reference-highlight-color-name">シアン</span>
+                </button>
+                <div id="reference-highlight-color-menu" class="font-color-menu" role="listbox" aria-label="強調する色" hidden></div>
+              </div>
+            </div>
+            <label class="reference-highlight-scope"><input id="reference-highlight-number-only" type="checkbox" /> 番号だけを強調</label>
+            <button id="reference-highlight" type="button" class="primary">本文で強調</button>
+          </div>
+        </details>
+        <details class="compound-section">
+          <summary><span>文献番号を途中に挿入</span><span class="section-help" role="img" tabindex="0" aria-label="文献番号を途中に挿入の説明" data-tooltip="指定した番号以降の本文中の引用と文献リストを同時に 1 つ繰り下げます。">?</span></summary>
+          <p class="lead">本文中の引用と文献リストを同時に 1 つ繰り下げます。</p>
+          <div class="number-controls">
+            <input id="reference-insert-number" type="number" min="1" value="1" aria-label="挿入する文献番号" />
+            <button id="reference-insert" type="button" class="primary">挿入して以降をずらす</button>
+          </div>
+        </details>
+        <details class="compound-section">
+          <summary><span>番号を一括変更</span><span class="section-help" role="img" tabindex="0" aria-label="文献番号を一括変更の説明" data-tooltip="本文中の引用と文献リストの番号をまとめて置き換えます。">?</span></summary>
+          <div class="number-controls two">
+            <input id="reference-from" type="number" min="1" value="1" aria-label="変更前の文献番号" />
+            <span aria-hidden="true">→</span>
+            <input id="reference-to" type="number" min="1" value="2" aria-label="変更後の文献番号" />
+            <button id="reference-replace" type="button">一括変更</button>
+          </div>
+        </details>
+      </div>
+
+      <div id="view-figures" hidden>
+        <details class="compound-section" open>
+          <summary><span>図・表一覧</span><span class="section-help" role="img" tabindex="0" aria-label="図・表一覧の説明" data-tooltip="本文に出てくる Figure、Fig.、Table、図、表の番号を集めます。キャプションと本文中の参照を番号ごとに分け、各場所のボタンから該当箇所へ移動できます。">?</span></summary>
+          <div id="figures"></div>
+        </details>
       </div>
 
       <div id="view-fonts" hidden>
-        <h2>フォントを置換</h2>
+        <details class="font-section" open>
+          <summary>フォントの種類</summary>
+          <p class="lead">使われている書体、使用箇所数、文字数、書体の種類を一覧します。</p>
+          <p id="font-summary" class="font-summary"></p>
+          <div id="font-usage" class="font-usage-grid"></div>
+        </details>
+        <details class="font-section">
+          <summary>フォントを置換</summary>
+          <p class="lead">元の書体と置換先を選んで、文書内の該当箇所をまとめて変更します。取り消しは ⌘Z です。</p>
+          <div class="font-controls font-replace-controls">
+            <label class="font-field">元のフォント<span class="font-select"><select id="font-replace-from"></select></span></label>
+            <span class="font-arrow" aria-hidden="true">→</span>
+            <label class="font-field">置換するフォント<span class="font-select"><select id="font-replace-to"></select></span></label>
+            <button id="font-replace" type="button" class="primary">置換</button>
+          </div>
+        </details>
+        <details class="font-section">
+          <summary>フォントを強調</summary>
+          <p class="lead">選んだ書体だけを、選んだ色でマーカー表示します。</p>
+          <div class="font-controls font-highlight-controls">
+            <label class="font-field">フォント<span class="font-select"><select id="font-highlight-select"></select></span></label>
+            <div class="font-field">
+              <span>色</span>
+              <div id="font-highlight-picker" class="font-color-picker">
+                <button id="font-highlight-color" type="button" class="font-color-button" aria-haspopup="listbox" aria-expanded="false">
+                  <span class="color-swatch" aria-hidden="true"></span>
+                  <span id="font-highlight-color-name">シアン</span>
+                </button>
+                <div id="font-highlight-color-menu" class="font-color-menu" role="listbox" aria-label="強調する色" hidden></div>
+              </div>
+            </div>
+            <button id="font-highlight" type="button" class="primary">本文で強調</button>
+          </div>
+        </details>
+        <details class="font-section" open>
+          <summary>書体の種類</summary>
+          <p class="lead">太字、斜体、上付き、下付きになっている文字数を一覧します。</p>
+          <p id="style-summary" class="font-summary"></p>
+          <div id="style-usage" class="style-usage"></div>
+        </details>
+        <details class="font-section">
+          <summary>書体を置換</summary>
+          <p class="lead">選んだ文字装飾を、別の装飾または通常の文字へまとめて変更します。取り消しは ⌘Z です。</p>
+          <div class="font-controls font-replace-controls">
+            <label class="font-field">元の書体<span class="font-select"><select id="style-replace-from"></select></span></label>
+            <span class="font-arrow" aria-hidden="true">→</span>
+            <label class="font-field">置換する書体<span class="font-select"><select id="style-replace-to"></select></span></label>
+            <button id="style-replace" type="button" class="primary">置換</button>
+          </div>
+        </details>
+        <details class="font-section">
+          <summary>書体を強調</summary>
+          <p class="lead">太字・斜体・上付き・下付きの文字だけを、選んだ色でマーカー表示します。</p>
+          <div class="font-controls font-highlight-controls">
+            <label class="font-field">書体<span class="font-select"><select id="style-highlight-select"></select></span></label>
+            <div class="font-field">
+              <span>色</span>
+              <div id="style-highlight-picker" class="font-color-picker">
+                <button id="style-highlight-color" type="button" class="font-color-button" aria-haspopup="listbox" aria-expanded="false">
+                  <span class="color-swatch" aria-hidden="true"></span>
+                  <span id="style-highlight-color-name">シアン</span>
+                </button>
+                <div id="style-highlight-color-menu" class="font-color-menu" role="listbox" aria-label="強調する色" hidden></div>
+              </div>
+            </div>
+            <button id="style-highlight" type="button" class="primary">本文で強調</button>
+          </div>
+        </details>
+        <details class="font-section">
+          <summary>スペースを強調</summary>
+          <p class="lead">半角スペースと全角スペースを別々の色で強調します。Word が利用できるマーカー色から選べます。</p>
+          <div class="font-controls font-highlight-controls">
+            <div class="font-field">
+              <span>半角スペース</span>
+              <div id="half-space-picker" class="font-color-picker">
+                <button id="half-space-color" type="button" class="font-color-button" aria-haspopup="listbox" aria-expanded="false">
+                  <span class="color-swatch" aria-hidden="true"></span>
+                  <span id="half-space-color-name">シアン</span>
+                </button>
+                <div id="half-space-color-menu" class="font-color-menu" role="listbox" aria-label="半角スペースの強調色" hidden></div>
+              </div>
+            </div>
+            <div class="font-field">
+              <span>全角スペース</span>
+              <div id="full-space-picker" class="font-color-picker">
+                <button id="full-space-color" type="button" class="font-color-button" aria-haspopup="listbox" aria-expanded="false">
+                  <span class="color-swatch" aria-hidden="true"></span>
+                  <span id="full-space-color-name">シアン</span>
+                </button>
+                <div id="full-space-color-menu" class="font-color-menu" role="listbox" aria-label="全角スペースの強調色" hidden></div>
+              </div>
+            </div>
+            <button id="highlight-spaces" type="button" class="primary">本文で強調</button>
+          </div>
+        </details>
+      </div>
+
+      <!-- リボンの［使い方］と、点検前の案内の［使い方をひらく］から。
+           初見の人がボタン 15 個を前にして最初の一手を決められなかった、
+           という実機での指摘に対する答え。 -->
+      <div id="view-help" hidden>
+        <h2>使い方</h2>
+
+        <h3>まずこれだけ</h3>
+        <ol class="help">
+          <li>原稿を開いて、リボンの<strong>［文書をチェック］</strong>を押します。</li>
+          <li>指摘がこのパネルに、<strong>分類 → ルール</strong>の 2 段で並びます。</li>
+          <li>各指摘の<strong>［文書内で表示］</strong>でその箇所へ飛べます。</li>
+          <li>直すなら<strong>［修正］</strong>、要らない指摘は<strong>［無視］</strong>。</li>
+        </ol>
         <p class="lead">
-          使われているフォントの一覧です。置換先を選んで［置換］を押すと、その書体の箇所をまとめて変更します。
-          取り消しは ⌘Z です。
+          同じルールの指摘は 1 つの見出しにまとまります。見出しの
+          <strong>［まとめて修正］</strong>で、そのルールの分だけ一括で直せます。
+          文書全体を一度に直すボタンは、意図的に置いていません。
         </p>
-        <div id="font-usage"></div>
+
+        <h3>指摘を原稿に残す</h3>
+        <p class="lead">
+          <strong>［指摘をマーカーで塗る］</strong>は分類ごとの色を塗るだけ。
+          <strong>［指摘をコメントとして挿入］</strong>は指摘文を Word のコメントとして付けるので、
+          返信や解決といった校閲機能がそのまま使えます。他人の原稿を返すときは後者が伝わります。
+        </p>
+
+        <h3>⚠️ 消すボタンは 2 種類あります</h3>
+        <table class="help">
+          <tr><th>ボタン</th><th>消える範囲</th></tr>
+          <tr><td>アドインの塗りを削除</td><td>このアドインが塗った箇所だけ</td></tr>
+          <tr><td><strong>ハイライトを全て削除</strong></td><td><strong>文書の全部</strong>（共著者の塗りも）</td></tr>
+          <tr><td>アドインのコメント削除</td><td>このアドインのコメントだけ</td></tr>
+          <tr><td><strong>コメントを全て削除</strong></td><td><strong>文書の全部</strong>（他人のコメントも）</td></tr>
+        </table>
+        <p class="lead">下 2 つを押してしまったときは ⌘Z で戻せます。</p>
+
+        <h3>数える 4 つの一覧</h3>
+        <ul class="help">
+          <li><strong>［化合物］</strong> — 番号ごとの回数と場所。1 回しか出てこない番号が分かります。</li>
+          <li><strong>［文献］</strong> — 引用番号と書誌。書誌の無い番号、引用されていない文献に印。</li>
+          <li><strong>［図・表］</strong> — キャプションと本文中の図表番号を、番号ごとに一覧。</li>
+          <li><strong>［文字］</strong> — フォントと文字装飾を一覧・置換・強調。</li>
+        </ul>
+        <p class="lead">どれも［← 指摘一覧に戻る］で戻れます。</p>
+
+        <h3>点検する項目を選ぶ</h3>
+        <p class="lead">
+          <strong>［ルール設定］</strong>が「何を点検するか」、<strong>［設定］</strong>が
+          「どう点検して、どう見せるか」（マーカーの色・長すぎる文の字数・欧文フォント）です。
+          設定はこの Mac にだけ保存されます。
+        </p>
+
+        <h3>知っておくと困らないこと</h3>
+        <ul class="help">
+          <li>点検は<strong>1 ページあたり数秒</strong>かかります。論文 1 本なら分単位になるので、
+            進行の表示が出ているあいだは待ってください。</li>
+          <li><strong>［無視］した指摘は原稿ファイルに残ります。</strong>次に同じ原稿を開いたときも
+            無視のままです。原稿を保存したときに一緒に書き込まれます。</li>
+          <li>無視の記録は原稿と一緒に動きます。<strong>共著者に原稿を渡すと、相手の画面でも
+            その指摘は出ません。</strong>［すべて戻す］で全部消せます。</li>
+          <li>新規文書ではリボンのタブが出ません。一度このアドインを使った文書には、次から出ます。</li>
+        </ul>
+
+        <h3>バージョン</h3>
+        <!-- 更新の案内は古いときしか出ないので、そのままだと「入れ直したのに
+             変わったのか分からない」。ここは最新でも古くても必ず出す。 -->
+        <p id="help-version" class="lead">確認しています…</p>
       </div>
     </main>
   </body>

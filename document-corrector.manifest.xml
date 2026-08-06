@@ -8,13 +8,18 @@
   xsi:type="TaskPaneApp">
 
   <Id>A0DEE6AC-C702-48D0-A88F-31E286D7B22C</Id>
-  <Version>1.13.0.0</Version>
+  <Version>1.16.0.24</Version>
+  <!-- RELEASE_NOTE: リボンのアイコンを描き直し、化合物一覧の表示と画像メモを見直しました。 -->
   <ProviderName>Fukazawa Lab</ProviderName>
   <DefaultLocale>ja-JP</DefaultLocale>
   <DisplayName DefaultValue="Document Corrector" />
   <Description DefaultValue="研究室の文章添削チェックリストのうち機械判定できる項目を点検し、指摘をマーカーで示します。" />
-  <IconUrl DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-32.png" />
-  <HighResolutionIconUrl DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-80.png" />
+  <!-- アドイン一覧に出る本体アイコン。?v= は Word のキャッシュ対策で、
+       <Version> と同じ値にしておく。最初に公開したときここは 1×1 の
+       透明 PNG（仮置き）で、Word はそれを憶えてしまい、あとから本物の
+       絵を置いても取り直さなかった。URL が変われば取り直す。 -->
+  <IconUrl DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-32.png?v=1.16.0.24" />
+  <HighResolutionIconUrl DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-80.png?v=1.16.0.24" />
   <SupportUrl DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/index.html" />
 
   <AppDomains>
@@ -26,7 +31,7 @@
   </Hosts>
 
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/taskpane.html?v=1.13.0.0" />
+    <SourceLocation DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/taskpane.html?v=1.16.0.24" />
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>
@@ -37,7 +42,7 @@
       JavaScript runtime, so a button can drive the pane's 指摘一覧 directly.
       Requires Word 2205+ on Windows / 16.61+ on Mac; on older builds Word
       ignores this whole VersionOverrides block and the pane still opens from
-      [挿入]>[アドイン].
+      [ホーム]>[アドイン].
     -->
     <Requirements>
       <bt:Sets DefaultMinVersion="1.1">
@@ -60,42 +65,11 @@
           <ExtensionPoint xsi:type="PrimaryCommandSurface">
             <CustomTab id="DocumentCorrector.Tab">
               <!--
-                One control per group. Word lays a group out as one large button
-                plus a column of small ones once it holds more than a couple, and
-                these are all top-level actions, so they get a group each.
+                Word draws dividers between groups. Only the paired commands separated
+                by a full-width space in the requested layout share the same group.
               -->
-              <!--
-                A ShowTaskpane control, unlike the ExecuteFunction ones below:
-                Word itself reopens the pane, so this works even when the pane
-                was closed with its own [×] and no add-in code is listening.
-                It is first in the tab because it is the way back.
-              -->
-              <Group id="DocumentCorrector.Group.Panel">
-                <Label resid="Panel.Label" />
-                <Icon>
-                  <bt:Image size="16" resid="Icon.Panel.16" />
-                  <bt:Image size="32" resid="Icon.Panel.32" />
-                  <bt:Image size="80" resid="Icon.Panel.80" />
-                </Icon>
-                <Control xsi:type="Button" id="DocumentCorrector.Panel">
-                  <Label resid="Panel.Label" />
-                  <Supertip>
-                    <Title resid="Panel.Label" />
-                    <Description resid="Panel.Tooltip" />
-                  </Supertip>
-                  <Icon>
-                    <bt:Image size="16" resid="Icon.Panel.16" />
-                    <bt:Image size="32" resid="Icon.Panel.32" />
-                    <bt:Image size="80" resid="Icon.Panel.80" />
-                  </Icon>
-                  <Action xsi:type="ShowTaskpane">
-                    <TaskpaneId>DocumentCorrector.Taskpane</TaskpaneId>
-                    <SourceLocation resid="Taskpane.Url" />
-                  </Action>
-                </Control>
-              </Group>
-              <Group id="DocumentCorrector.Group.Review">
-                <Label resid="Review.Label" />
+              <Group id="DocumentCorrector.Group.Main">
+                <Label resid="Main.Label" />
                 <Icon>
                   <bt:Image size="16" resid="Icon.Review.16" />
                   <bt:Image size="32" resid="Icon.Review.32" />
@@ -116,166 +90,151 @@
                     <FunctionName>runReview</FunctionName>
                   </Action>
                 </Control>
+              <!-- ShowTaskpane is deliberately after the first two actions:
+                   it reopens a closed result pane without starting a new scan. -->
+                <Control xsi:type="Button" id="DocumentCorrector.Panel">
+                  <Label resid="Panel.Label" />
+                  <Supertip>
+                    <Title resid="Panel.Label" />
+                    <Description resid="Panel.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.Panel.16" />
+                    <bt:Image size="32" resid="Icon.Panel.32" />
+                    <bt:Image size="80" resid="Icon.Panel.80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>DocumentCorrector.Taskpane</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Url" />
+                  </Action>
+                </Control>
               </Group>
-              <Group id="DocumentCorrector.Group.Highlight">
-                <Label resid="HighlightFindings.Label" />
+              <Group id="DocumentCorrector.Group.Apply">
+                <Label resid="ApplyFindings.Label" />
                 <Icon>
                   <bt:Image size="16" resid="Icon.Marker.16" />
                   <bt:Image size="32" resid="Icon.Marker.32" />
                   <bt:Image size="80" resid="Icon.Marker.80" />
                 </Icon>
-                <Control xsi:type="Button" id="DocumentCorrector.HighlightFindings">
-                  <Label resid="HighlightFindings.Label" />
+                <Control xsi:type="Menu" id="DocumentCorrector.ApplyFindings">
+                  <Label resid="ApplyFindings.Label" />
                   <Supertip>
-                    <Title resid="HighlightFindings.Label" />
-                    <Description resid="HighlightFindings.Tooltip" />
+                    <Title resid="ApplyFindings.Label" />
+                    <Description resid="ApplyFindings.Tooltip" />
                   </Supertip>
                   <Icon>
                     <bt:Image size="16" resid="Icon.Marker.16" />
                     <bt:Image size="32" resid="Icon.Marker.32" />
                     <bt:Image size="80" resid="Icon.Marker.80" />
                   </Icon>
-                  <Action xsi:type="ExecuteFunction">
-                    <FunctionName>highlightFindings</FunctionName>
-                  </Action>
+                  <Items>
+                    <Item id="DocumentCorrector.HighlightFindings">
+                      <Label resid="HighlightFindings.Label" />
+                      <Supertip>
+                        <Title resid="HighlightFindings.Label" />
+                        <Description resid="HighlightFindings.Tooltip" />
+                      </Supertip>
+                      <Icon>
+                        <bt:Image size="16" resid="Icon.Marker.16" />
+                        <bt:Image size="32" resid="Icon.Marker.32" />
+                        <bt:Image size="80" resid="Icon.Marker.80" />
+                      </Icon>
+                      <Action xsi:type="ExecuteFunction"><FunctionName>highlightFindings</FunctionName></Action>
+                    </Item>
+                    <Item id="DocumentCorrector.CommentFindings">
+                      <Label resid="CommentFindings.Label" />
+                      <Supertip>
+                        <Title resid="CommentFindings.Label" />
+                        <Description resid="CommentFindings.Tooltip" />
+                      </Supertip>
+                      <Icon>
+                        <bt:Image size="16" resid="Icon.Comment.16" />
+                        <bt:Image size="32" resid="Icon.Comment.32" />
+                        <bt:Image size="80" resid="Icon.Comment.80" />
+                      </Icon>
+                      <Action xsi:type="ExecuteFunction"><FunctionName>commentFindings</FunctionName></Action>
+                    </Item>
+                  </Items>
                 </Control>
-              </Group>
-              <Group id="DocumentCorrector.Group.Clear">
-                <Label resid="ClearHighlights.Label" />
-                <Icon>
-                  <bt:Image size="16" resid="Icon.Eraser.16" />
-                  <bt:Image size="32" resid="Icon.Eraser.32" />
-                  <bt:Image size="80" resid="Icon.Eraser.80" />
-                </Icon>
-                <Control xsi:type="Button" id="DocumentCorrector.ClearHighlights">
-                  <Label resid="ClearHighlights.Label" />
+                <Control xsi:type="Menu" id="DocumentCorrector.Cleanup">
+                  <Label resid="Cleanup.Label" />
                   <Supertip>
-                    <Title resid="ClearHighlights.Label" />
-                    <Description resid="ClearHighlights.Tooltip" />
+                    <Title resid="Cleanup.Label" />
+                    <Description resid="Cleanup.Tooltip" />
                   </Supertip>
                   <Icon>
                     <bt:Image size="16" resid="Icon.Eraser.16" />
                     <bt:Image size="32" resid="Icon.Eraser.32" />
                     <bt:Image size="80" resid="Icon.Eraser.80" />
                   </Icon>
-                  <Action xsi:type="ExecuteFunction">
-                    <FunctionName>clearHighlights</FunctionName>
-                  </Action>
+                  <Items>
+                    <Item id="DocumentCorrector.ClearHighlights">
+                      <Label resid="ClearHighlights.Label" />
+                      <Supertip><Title resid="ClearHighlights.Label" /><Description resid="ClearHighlights.Tooltip" /></Supertip>
+                      <Icon><bt:Image size="16" resid="Icon.Eraser.16" /><bt:Image size="32" resid="Icon.Eraser.32" /><bt:Image size="80" resid="Icon.Eraser.80" /></Icon>
+                      <Action xsi:type="ExecuteFunction"><FunctionName>clearHighlights</FunctionName></Action>
+                    </Item>
+                    <Item id="DocumentCorrector.ClearComments">
+                      <Label resid="ClearComments.Label" />
+                      <Supertip><Title resid="ClearComments.Label" /><Description resid="ClearComments.Tooltip" /></Supertip>
+                      <Icon><bt:Image size="16" resid="Icon.CommentClear.16" /><bt:Image size="32" resid="Icon.CommentClear.32" /><bt:Image size="80" resid="Icon.CommentClear.80" /></Icon>
+                      <Action xsi:type="ExecuteFunction"><FunctionName>clearComments</FunctionName></Action>
+                    </Item>
+                    <Item id="DocumentCorrector.ClearAllHighlights">
+                      <Label resid="ClearAllHighlights.Label" />
+                      <Supertip><Title resid="ClearAllHighlights.Label" /><Description resid="ClearAllHighlights.Tooltip" /></Supertip>
+                      <Icon><bt:Image size="16" resid="Icon.EraserAll.16" /><bt:Image size="32" resid="Icon.EraserAll.32" /><bt:Image size="80" resid="Icon.EraserAll.80" /></Icon>
+                      <Action xsi:type="ExecuteFunction"><FunctionName>clearAllHighlights</FunctionName></Action>
+                    </Item>
+                    <Item id="DocumentCorrector.ClearAllComments">
+                      <Label resid="ClearAllComments.Label" />
+                      <Supertip><Title resid="ClearAllComments.Label" /><Description resid="ClearAllComments.Tooltip" /></Supertip>
+                      <Icon><bt:Image size="16" resid="Icon.CommentClearAll.16" /><bt:Image size="32" resid="Icon.CommentClearAll.32" /><bt:Image size="80" resid="Icon.CommentClearAll.80" /></Icon>
+                      <Action xsi:type="ExecuteFunction"><FunctionName>clearAllComments</FunctionName></Action>
+                    </Item>
+                  </Items>
                 </Control>
               </Group>
-              <Group id="DocumentCorrector.Group.ClearAll">
-                <Label resid="ClearAllHighlights.Label" />
+              <Group id="DocumentCorrector.Group.Rules">
+                <Label resid="Rules.Label" />
                 <Icon>
-                  <bt:Image size="16" resid="Icon.EraserAll.16" />
-                  <bt:Image size="32" resid="Icon.EraserAll.32" />
-                  <bt:Image size="80" resid="Icon.EraserAll.80" />
+                  <bt:Image size="16" resid="Icon.Rules.16" />
+                  <bt:Image size="32" resid="Icon.Rules.32" />
+                  <bt:Image size="80" resid="Icon.Rules.80" />
                 </Icon>
-                <Control xsi:type="Button" id="DocumentCorrector.ClearAllHighlights">
-                  <Label resid="ClearAllHighlights.Label" />
+                <Control xsi:type="Button" id="DocumentCorrector.Rules">
+                  <Label resid="Rules.Label" />
                   <Supertip>
-                    <Title resid="ClearAllHighlights.Label" />
-                    <Description resid="ClearAllHighlights.Tooltip" />
+                    <Title resid="Rules.Label" />
+                    <Description resid="Rules.Tooltip" />
                   </Supertip>
                   <Icon>
-                    <bt:Image size="16" resid="Icon.EraserAll.16" />
-                    <bt:Image size="32" resid="Icon.EraserAll.32" />
-                    <bt:Image size="80" resid="Icon.EraserAll.80" />
+                    <bt:Image size="16" resid="Icon.Rules.16" />
+                    <bt:Image size="32" resid="Icon.Rules.32" />
+                    <bt:Image size="80" resid="Icon.Rules.80" />
                   </Icon>
-                  <Action xsi:type="ExecuteFunction">
-                    <FunctionName>clearAllHighlights</FunctionName>
-                  </Action>
+                  <Action xsi:type="ExecuteFunction"><FunctionName>openRules</FunctionName></Action>
                 </Control>
               </Group>
-              <Group id="DocumentCorrector.Group.Comment">
-                <Label resid="CommentFindings.Label" />
+              <Group id="DocumentCorrector.Group.Fonts">
+                <Label resid="Fonts.Label" />
                 <Icon>
-                  <bt:Image size="16" resid="Icon.Comment.16" />
-                  <bt:Image size="32" resid="Icon.Comment.32" />
-                  <bt:Image size="80" resid="Icon.Comment.80" />
+                  <bt:Image size="16" resid="Icon.Fonts.16" />
+                  <bt:Image size="32" resid="Icon.Fonts.32" />
+                  <bt:Image size="80" resid="Icon.Fonts.80" />
                 </Icon>
-                <Control xsi:type="Button" id="DocumentCorrector.CommentFindings">
-                  <Label resid="CommentFindings.Label" />
+                <Control xsi:type="Button" id="DocumentCorrector.Fonts">
+                  <Label resid="Fonts.Label" />
                   <Supertip>
-                    <Title resid="CommentFindings.Label" />
-                    <Description resid="CommentFindings.Tooltip" />
+                    <Title resid="Fonts.Label" />
+                    <Description resid="Fonts.Tooltip" />
                   </Supertip>
                   <Icon>
-                    <bt:Image size="16" resid="Icon.Comment.16" />
-                    <bt:Image size="32" resid="Icon.Comment.32" />
-                    <bt:Image size="80" resid="Icon.Comment.80" />
+                    <bt:Image size="16" resid="Icon.Fonts.16" />
+                    <bt:Image size="32" resid="Icon.Fonts.32" />
+                    <bt:Image size="80" resid="Icon.Fonts.80" />
                   </Icon>
-                  <Action xsi:type="ExecuteFunction">
-                    <FunctionName>commentFindings</FunctionName>
-                  </Action>
-                </Control>
-              </Group>
-              <Group id="DocumentCorrector.Group.ClearComments">
-                <Label resid="ClearComments.Label" />
-                <Icon>
-                  <bt:Image size="16" resid="Icon.CommentClear.16" />
-                  <bt:Image size="32" resid="Icon.CommentClear.32" />
-                  <bt:Image size="80" resid="Icon.CommentClear.80" />
-                </Icon>
-                <Control xsi:type="Button" id="DocumentCorrector.ClearComments">
-                  <Label resid="ClearComments.Label" />
-                  <Supertip>
-                    <Title resid="ClearComments.Label" />
-                    <Description resid="ClearComments.Tooltip" />
-                  </Supertip>
-                  <Icon>
-                    <bt:Image size="16" resid="Icon.CommentClear.16" />
-                    <bt:Image size="32" resid="Icon.CommentClear.32" />
-                    <bt:Image size="80" resid="Icon.CommentClear.80" />
-                  </Icon>
-                  <Action xsi:type="ExecuteFunction">
-                    <FunctionName>clearComments</FunctionName>
-                  </Action>
-                </Control>
-              </Group>
-              <Group id="DocumentCorrector.Group.ClearAllComments">
-                <Label resid="ClearAllComments.Label" />
-                <Icon>
-                  <bt:Image size="16" resid="Icon.CommentClearAll.16" />
-                  <bt:Image size="32" resid="Icon.CommentClearAll.32" />
-                  <bt:Image size="80" resid="Icon.CommentClearAll.80" />
-                </Icon>
-                <Control xsi:type="Button" id="DocumentCorrector.ClearAllComments">
-                  <Label resid="ClearAllComments.Label" />
-                  <Supertip>
-                    <Title resid="ClearAllComments.Label" />
-                    <Description resid="ClearAllComments.Tooltip" />
-                  </Supertip>
-                  <Icon>
-                    <bt:Image size="16" resid="Icon.CommentClearAll.16" />
-                    <bt:Image size="32" resid="Icon.CommentClearAll.32" />
-                    <bt:Image size="80" resid="Icon.CommentClearAll.80" />
-                  </Icon>
-                  <Action xsi:type="ExecuteFunction">
-                    <FunctionName>clearAllComments</FunctionName>
-                  </Action>
-                </Control>
-              </Group>
-              <Group id="DocumentCorrector.Group.Spaces">
-                <Label resid="HighlightSpaces.Label" />
-                <Icon>
-                  <bt:Image size="16" resid="Icon.Space.16" />
-                  <bt:Image size="32" resid="Icon.Space.32" />
-                  <bt:Image size="80" resid="Icon.Space.80" />
-                </Icon>
-                <Control xsi:type="Button" id="DocumentCorrector.HighlightSpaces">
-                  <Label resid="HighlightSpaces.Label" />
-                  <Supertip>
-                    <Title resid="HighlightSpaces.Label" />
-                    <Description resid="HighlightSpaces.Tooltip" />
-                  </Supertip>
-                  <Icon>
-                    <bt:Image size="16" resid="Icon.Space.16" />
-                    <bt:Image size="32" resid="Icon.Space.32" />
-                    <bt:Image size="80" resid="Icon.Space.80" />
-                  </Icon>
-                  <Action xsi:type="ExecuteFunction">
-                    <FunctionName>highlightSpaces</FunctionName>
-                  </Action>
+                  <Action xsi:type="ExecuteFunction"><FunctionName>replaceFonts</FunctionName></Action>
                 </Control>
               </Group>
               <Group id="DocumentCorrector.Group.Compounds">
@@ -324,49 +283,47 @@
                   </Action>
                 </Control>
               </Group>
-              <Group id="DocumentCorrector.Group.Fonts">
-                <Label resid="Fonts.Label" />
+              <Group id="DocumentCorrector.Group.Figures">
+                <Label resid="Figures.Label" />
                 <Icon>
-                  <bt:Image size="16" resid="Icon.Fonts.16" />
-                  <bt:Image size="32" resid="Icon.Fonts.32" />
-                  <bt:Image size="80" resid="Icon.Fonts.80" />
+                  <bt:Image size="16" resid="Icon.Figures.16" />
+                  <bt:Image size="32" resid="Icon.Figures.32" />
+                  <bt:Image size="80" resid="Icon.Figures.80" />
                 </Icon>
-                <Control xsi:type="Button" id="DocumentCorrector.Fonts">
-                  <Label resid="Fonts.Label" />
+                <Control xsi:type="Button" id="DocumentCorrector.Figures">
+                  <Label resid="Figures.Label" />
                   <Supertip>
-                    <Title resid="Fonts.Label" />
-                    <Description resid="Fonts.Tooltip" />
+                    <Title resid="Figures.Label" />
+                    <Description resid="Figures.Tooltip" />
                   </Supertip>
                   <Icon>
-                    <bt:Image size="16" resid="Icon.Fonts.16" />
-                    <bt:Image size="32" resid="Icon.Fonts.32" />
-                    <bt:Image size="80" resid="Icon.Fonts.80" />
+                    <bt:Image size="16" resid="Icon.Figures.16" />
+                    <bt:Image size="32" resid="Icon.Figures.32" />
+                    <bt:Image size="80" resid="Icon.Figures.80" />
                   </Icon>
-                  <Action xsi:type="ExecuteFunction">
-                    <FunctionName>replaceFonts</FunctionName>
-                  </Action>
+                  <Action xsi:type="ExecuteFunction"><FunctionName>listFigures</FunctionName></Action>
                 </Control>
               </Group>
-              <Group id="DocumentCorrector.Group.Rules">
-                <Label resid="Rules.Label" />
+              <Group id="DocumentCorrector.Group.Help">
+                <Label resid="Help.Label" />
                 <Icon>
-                  <bt:Image size="16" resid="Icon.Rules.16" />
-                  <bt:Image size="32" resid="Icon.Rules.32" />
-                  <bt:Image size="80" resid="Icon.Rules.80" />
+                  <bt:Image size="16" resid="Icon.Help.16" />
+                  <bt:Image size="32" resid="Icon.Help.32" />
+                  <bt:Image size="80" resid="Icon.Help.80" />
                 </Icon>
-                <Control xsi:type="Button" id="DocumentCorrector.Rules">
-                  <Label resid="Rules.Label" />
+                <Control xsi:type="Button" id="DocumentCorrector.Help">
+                  <Label resid="Help.Label" />
                   <Supertip>
-                    <Title resid="Rules.Label" />
-                    <Description resid="Rules.Tooltip" />
+                    <Title resid="Help.Label" />
+                    <Description resid="Help.Tooltip" />
                   </Supertip>
                   <Icon>
-                    <bt:Image size="16" resid="Icon.Rules.16" />
-                    <bt:Image size="32" resid="Icon.Rules.32" />
-                    <bt:Image size="80" resid="Icon.Rules.80" />
+                    <bt:Image size="16" resid="Icon.Help.16" />
+                    <bt:Image size="32" resid="Icon.Help.32" />
+                    <bt:Image size="80" resid="Icon.Help.80" />
                   </Icon>
                   <Action xsi:type="ExecuteFunction">
-                    <FunctionName>openRules</FunctionName>
+                    <FunctionName>showHelp</FunctionName>
                   </Action>
                 </Control>
               </Group>
@@ -401,90 +358,102 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-16.png" />
-        <bt:Image id="Icon.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-32.png" />
-        <bt:Image id="Icon.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-80.png" />
-        <bt:Image id="Icon.Panel.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-panel-16.png" />
-        <bt:Image id="Icon.Panel.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-panel-32.png" />
-        <bt:Image id="Icon.Panel.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-panel-80.png" />
-        <bt:Image id="Icon.Review.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-review-16.png" />
-        <bt:Image id="Icon.Review.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-review-32.png" />
-        <bt:Image id="Icon.Review.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-review-80.png" />
-        <bt:Image id="Icon.Rules.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-rules-16.png" />
-        <bt:Image id="Icon.Rules.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-rules-32.png" />
-        <bt:Image id="Icon.Rules.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-rules-80.png" />
+        <!-- 本体アイコン（icon-16/32/80.png）はここには要らない。リボンのボタンは
+             どれも自分の絵を持っており、一覧に出る本体アイコンは上の IconUrl /
+             HighResolutionIconUrl が URL を直接名指ししているため。 -->
+        <!-- Word caches ribbon images by URL.  Whenever an icon is redrawn,
+             stamp its three URLs with the current Version, just as the add-in
+             icon above does; without that Word keeps showing the old picture. -->
+        <bt:Image id="Icon.Panel.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-panel-16.png?v=1.16.0.24" />
+        <bt:Image id="Icon.Panel.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-panel-32.png?v=1.16.0.24" />
+        <bt:Image id="Icon.Panel.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-panel-80.png?v=1.16.0.24" />
+        <bt:Image id="Icon.Review.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-review-16.png?v=1.16.0.24" />
+        <bt:Image id="Icon.Review.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-review-32.png?v=1.16.0.24" />
+        <bt:Image id="Icon.Review.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-review-80.png?v=1.16.0.24" />
+        <bt:Image id="Icon.Rules.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-rules-16.png?v=1.16.0.24" />
+        <bt:Image id="Icon.Rules.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-rules-32.png?v=1.16.0.24" />
+        <bt:Image id="Icon.Rules.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-rules-80.png?v=1.16.0.24" />
         <bt:Image id="Icon.Marker.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-marker-16.png" />
         <bt:Image id="Icon.Marker.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-marker-32.png" />
         <bt:Image id="Icon.Marker.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-marker-80.png" />
-        <bt:Image id="Icon.Space.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-space-16.png" />
-        <bt:Image id="Icon.Space.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-space-32.png" />
-        <bt:Image id="Icon.Space.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-space-80.png" />
         <bt:Image id="Icon.Eraser.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-eraser-16.png" />
         <bt:Image id="Icon.Eraser.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-eraser-32.png" />
         <bt:Image id="Icon.Eraser.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-eraser-80.png" />
         <bt:Image id="Icon.EraserAll.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-eraser-all-16.png" />
         <bt:Image id="Icon.EraserAll.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-eraser-all-32.png" />
         <bt:Image id="Icon.EraserAll.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-eraser-all-80.png" />
-        <bt:Image id="Icon.CommentClearAll.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-comment-clear-all-16.png" />
-        <bt:Image id="Icon.CommentClearAll.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-comment-clear-all-32.png" />
-        <bt:Image id="Icon.CommentClearAll.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-comment-clear-all-80.png" />
+        <bt:Image id="Icon.CommentClearAll.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-comment-clear-all-16.png?v=1.16.0.20" />
+        <bt:Image id="Icon.CommentClearAll.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-comment-clear-all-32.png?v=1.16.0.20" />
+        <bt:Image id="Icon.CommentClearAll.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-comment-clear-all-80.png?v=1.16.0.20" />
         <bt:Image id="Icon.Comment.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-comment-16.png" />
         <bt:Image id="Icon.Comment.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-comment-32.png" />
         <bt:Image id="Icon.Comment.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-comment-80.png" />
-        <bt:Image id="Icon.CommentClear.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-comment-clear-16.png" />
-        <bt:Image id="Icon.CommentClear.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-comment-clear-32.png" />
-        <bt:Image id="Icon.CommentClear.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-comment-clear-80.png" />
+        <bt:Image id="Icon.CommentClear.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-comment-clear-16.png?v=1.16.0.20" />
+        <bt:Image id="Icon.CommentClear.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-comment-clear-32.png?v=1.16.0.20" />
+        <bt:Image id="Icon.CommentClear.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-comment-clear-80.png?v=1.16.0.20" />
+        <bt:Image id="Icon.Help.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-help-16.png?v=1.16.0.20" />
+        <bt:Image id="Icon.Help.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-help-32.png?v=1.16.0.20" />
+        <bt:Image id="Icon.Help.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-help-80.png?v=1.16.0.20" />
         <bt:Image id="Icon.Settings.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-settings-16.png" />
         <bt:Image id="Icon.Settings.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-settings-32.png" />
         <bt:Image id="Icon.Settings.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-settings-80.png" />
-        <bt:Image id="Icon.Compounds.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-compounds-16.png" />
-        <bt:Image id="Icon.Compounds.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-compounds-32.png" />
-        <bt:Image id="Icon.Compounds.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-compounds-80.png" />
-        <bt:Image id="Icon.References.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-references-16.png" />
-        <bt:Image id="Icon.References.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-references-32.png" />
-        <bt:Image id="Icon.References.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-references-80.png" />
-        <bt:Image id="Icon.Fonts.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-fonts-16.png" />
-        <bt:Image id="Icon.Fonts.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-fonts-32.png" />
-        <bt:Image id="Icon.Fonts.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-fonts-80.png" />
+        <bt:Image id="Icon.Compounds.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-compounds-16.png?v=1.16.0.24" />
+        <bt:Image id="Icon.Compounds.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-compounds-32.png?v=1.16.0.24" />
+        <bt:Image id="Icon.Compounds.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-compounds-80.png?v=1.16.0.24" />
+        <bt:Image id="Icon.References.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-references-16.png?v=1.16.0.24" />
+        <bt:Image id="Icon.References.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-references-32.png?v=1.16.0.24" />
+        <bt:Image id="Icon.References.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-references-80.png?v=1.16.0.24" />
+        <bt:Image id="Icon.Figures.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-figures-16.png" />
+        <bt:Image id="Icon.Figures.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-figures-32.png" />
+        <bt:Image id="Icon.Figures.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-figures-80.png" />
+        <bt:Image id="Icon.Fonts.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-fonts-16.png?v=1.16.0.24" />
+        <bt:Image id="Icon.Fonts.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-fonts-32.png?v=1.16.0.24" />
+        <bt:Image id="Icon.Fonts.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-fonts-80.png?v=1.16.0.24" />
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/taskpane.html?v=1.13.0.0" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/taskpane.html?v=1.16.0.24" />
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/index.html" />
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="Tab.Label" DefaultValue="Corrector" />
-        <bt:String id="Group.Label" DefaultValue="Corrector" />
-        <bt:String id="Panel.Label" DefaultValue="パネルを開く" />
+        <bt:String id="Main.Label" DefaultValue="開始・反映" />
+        <bt:String id="Panel.Label" DefaultValue="結果を表示" />
         <bt:String id="Review.Label" DefaultValue="文書をチェック" />
         <bt:String id="Rules.Label" DefaultValue="ルール設定" />
+        <bt:String id="ApplyFindings.Label" DefaultValue="指摘を反映" />
+        <bt:String id="Cleanup.Label" DefaultValue="反映を削除" />
+        <bt:String id="Help.Label" DefaultValue="使い方" />
         <bt:String id="Settings.Label" DefaultValue="設定" />
         <bt:String id="HighlightFindings.Label" DefaultValue="指摘をマーカーで塗る" />
         <bt:String id="CommentFindings.Label" DefaultValue="指摘をコメントとして挿入" />
-        <bt:String id="HighlightSpaces.Label" DefaultValue="スペース強調" />
         <bt:String id="ClearHighlights.Label" DefaultValue="アドインの塗りを削除" />
         <bt:String id="ClearComments.Label" DefaultValue="アドインのコメント削除" />
         <bt:String id="ClearAllHighlights.Label" DefaultValue="ハイライトを全て削除" />
         <bt:String id="ClearAllComments.Label" DefaultValue="コメントを全て削除" />
         <bt:String id="Compounds.Label" DefaultValue="化合物" />
         <bt:String id="References.Label" DefaultValue="文献" />
-        <bt:String id="Fonts.Label" DefaultValue="フォントを置換" />
+        <bt:String id="Figures.Label" DefaultValue="図・表" />
+        <bt:String id="Fonts.Label" DefaultValue="文字" />
         <bt:String id="GetStarted.Title" DefaultValue="Document Corrector を開きました" />
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="Panel.Tooltip" DefaultValue="指摘一覧のパネルを開き直します。パネルを［×］で閉じても、ここから元の一覧に戻れます。" />
+        <bt:String id="Panel.Tooltip" DefaultValue="閉じた結果パネルを開き直します。点検をやり直さずに、直前の指摘一覧へ戻れます。" />
         <bt:String id="Review.Tooltip" DefaultValue="文章添削チェックリストに沿って文書を点検し、指摘をパネルに一覧します。パネルが閉じていれば開きます。" />
         <bt:String id="Rules.Tooltip" DefaultValue="どのルールで点検するかを、カテゴリごとのタブで選びます。" />
+        <bt:String id="ApplyFindings.Tooltip" DefaultValue="直前の点検結果を、マーカーまたは Word のコメントとして文書に反映します。" />
+        <bt:String id="Cleanup.Tooltip" DefaultValue="アドインが反映したマーカーまたはコメントを消去します。全削除の操作もここにまとめます。" />
+        <bt:String id="Help.Tooltip" DefaultValue="操作の手順と、消すボタンの違いをパネルに表示します。" />
         <bt:String id="Settings.Tooltip" DefaultValue="マーカーの色、長すぎる文の字数、欧文フォントなどを設定します。" />
         <bt:String id="HighlightFindings.Tooltip" DefaultValue="直前の点検結果を、チェックリストのカテゴリ色で塗ります。" />
         <bt:String id="CommentFindings.Tooltip" DefaultValue="直前の点検結果を Word のコメントとして挿入します。返信や解決は Word の校閲機能でそのまま行えます。" />
-        <bt:String id="HighlightSpaces.Tooltip" DefaultValue="文書中の半角・全角スペースを水色でハイライトします。" />
         <bt:String id="ClearHighlights.Tooltip" DefaultValue="このアドインが塗ったハイライトだけを消します。手で塗ったマーカーは残ります。" />
         <bt:String id="ClearComments.Tooltip" DefaultValue="このアドインが挿入したコメントだけを削除します。もとからあるコメントは残ります。" />
         <bt:String id="ClearAllHighlights.Tooltip" DefaultValue="文書のハイライトを、誰が塗ったものでも全て消します。共著者や自分が手で塗ったマーカーも消えます。元に戻すのは ⌘Z（Ctrl+Z）だけです。" />
         <bt:String id="ClearAllComments.Tooltip" DefaultValue="文書のコメントを、誰が書いたものでも全て削除します。指導教員や共著者のコメントも消えます。元に戻すのは ⌘Z（Ctrl+Z）だけです。" />
         <bt:String id="Compounds.Tooltip" DefaultValue="本文に出てくる化合物番号を、回数つきで一覧にします。番号をクリックすると該当箇所へ順に移動します。" />
         <bt:String id="References.Tooltip" DefaultValue="本文が引用している文献番号を、回数つきで一覧にします。引用されていない番号があれば知らせます。" />
-        <bt:String id="Fonts.Tooltip" DefaultValue="使われているフォントを一覧にし、選んだ書体へまとめて置換します。取り消しは ⌘Z（Ctrl+Z）です。" />
+        <bt:String id="Figures.Tooltip" DefaultValue="本文中の Figure、Fig.、Table、図、表を番号ごとに一覧にし、キャプションと本文参照の場所を確認します。" />
+        <bt:String id="Fonts.Tooltip" DefaultValue="フォントと文字装飾を一覧にし、選んだ項目をまとめて置換・強調します。取り消しは ⌘Z（Ctrl+Z）です。" />
         <bt:String id="GetStarted.Description" DefaultValue="リボンの[Document Corrector]タブから操作できます。" />
       </bt:LongStrings>
     </Resources>

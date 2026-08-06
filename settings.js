@@ -590,6 +590,32 @@
     "BuOK",
     "BuONa"
   ]);
+  var EN_DASH_PAIRS = Object.freeze([
+    ["HOMO", "LUMO"],
+    ["HOMO", "SOMO"],
+    ["SOMO", "LUMO"],
+    ["donor", "acceptor"],
+    ["structure", "property"],
+    ["structure", "activity"],
+    ["metal", "ligand"],
+    ["Diels", "Alder"],
+    ["Suzuki", "Miyaura"],
+    ["Sonogashira", "Hagihara"],
+    ["Buchwald", "Hartwig"],
+    ["Mizoroki", "Heck"],
+    ["Stille", "Migita"],
+    ["Friedel", "Crafts"],
+    ["Birch", "H\xFCckel"],
+    ["Marcus", "Hush"],
+    ["Jahn", "Teller"],
+    ["Beer", "Lambert"],
+    ["Stern", "Volmer"],
+    ["Franck", "Condon"],
+    ["Born", "Oppenheimer"],
+    ["Lennard", "Jones"],
+    ["Hartree", "Fock"],
+    ["Kohn", "Sham"]
+  ]);
 
   // src/core/text.ts
   var CLASS = Object.freeze({
@@ -990,6 +1016,10 @@
   var GREEK = "\\u0370-\\u03FF\\u1F00-\\u1FFF";
   var CJK = "\\u3040-\\u30FF\\u3400-\\u4DBF\\u4E00-\\u9FFF";
   var GREEK_CJK_BOUNDARY = new RegExp(`([${GREEK}][${CJK}])|([${CJK}][${GREEK}])`, "gu");
+  var SYMBOL_CJK_BOUNDARY = new RegExp(
+    `((?<![A-Za-z0-9])[A-Za-z][${CJK}])|([${CJK}][A-Za-z](?![A-Za-z0-9]))`,
+    "gu"
+  );
   var greekSpacingRule = {
     id: "greek-cjk-space",
     category: "format",
@@ -1011,7 +1041,21 @@
           })
         );
       }
-      return found;
+      for (const m of matchAll(SYMBOL_CJK_BOUNDARY, text)) {
+        const pair = m[0];
+        const replacement = `${pair[0]} ${pair[1]}`;
+        found.push(
+          finding(greekSpacingRule, {
+            severity: "confirm",
+            paragraphIndex: index,
+            start: m.index,
+            matched: pair,
+            replacement,
+            message: `\u30AE\u30EA\u30B7\u30E3\u6587\u5B57\u3068\u548C\u6587\u306E\u9593\u306B\u534A\u89D2\u30B9\u30DA\u30FC\u30B9\uFF1A\u300C${pair}\u300D\u2192\u300C${replacement}\u300D\uFF08\u6295\u7A3F\u898F\u7A0B\u3092\u78BA\u8A8D\uFF09`
+          })
+        );
+      }
+      return found.sort((a, b) => a.start - b.start);
     }
   };
   var JA_CHAR = /[\p{sc=Hiragana}\p{sc=Katakana}\p{sc=Han}]/u;
@@ -1054,8 +1098,40 @@
       return found;
     }
   };
+  var EN_DASH_PAIR = new RegExp(
+    `(?<![A-Za-z0-9-])(${EN_DASH_PAIRS.map(([a]) => escapeRegExp(a)).join("|")})-(${EN_DASH_PAIRS.map(
+      ([, b]) => escapeRegExp(b)
+    ).join("|")})(?![A-Za-z0-9-])`,
+    "giu"
+  );
+  var PAIR_KEYS = new Set(EN_DASH_PAIRS.map(([a, b]) => `${a}-${b}`.toLowerCase()));
+  var pairDashRule = {
+    id: "pair-dash",
+    category: "format",
+    title: "\u5BFE\u306B\u306A\u308B\u8A9E\u3092\u7D50\u3076\u6A2A\u68D2\u306F en dash",
+    kind: "paragraph",
+    run(text, index) {
+      const found = [];
+      for (const m of matchAll(EN_DASH_PAIR, text)) {
+        if (!PAIR_KEYS.has(`${m[1]}-${m[2]}`.toLowerCase())) continue;
+        const replacement = `${m[1]}\u2013${m[2]}`;
+        found.push(
+          finding(pairDashRule, {
+            severity: "fix",
+            paragraphIndex: index,
+            start: m.index,
+            matched: m[0],
+            replacement,
+            message: `\u5BFE\u306B\u306A\u308B\u8A9E\u3092\u7D50\u3076\u6A2A\u68D2\u306F en dash\uFF08\u2013\uFF09\uFF1A\u300C${m[0]}\u300D\u2192\u300C${replacement}\u300D`
+          })
+        );
+      }
+      return found;
+    }
+  };
   var FORMAT_RULES = [
     rangeDashRule,
+    pairDashRule,
     negativeDashRule,
     celsiusSignRule,
     compoundHyphenRule,
@@ -1133,6 +1209,10 @@
       summary: "\u2103\uFF08U+2103\uFF09\u3084 \u2109 \u306E\u3088\u3046\u306A 1 \u6587\u5B57\u306E\u5358\u4F4D\u8A18\u53F7\u3002\u300C\xB0\u300D\uFF0B\u300CC\u300D\u306E 2 \u6587\u5B57\u3067\u66F8\u304D\u307E\u3059\u3002Mac \u306E\u5EA6\u8A18\u53F7\u306F \u2325 + shift + 8 \u3067\u3059\u3002\u89D2\u5EA6\u306E 90\xB0 \u306F\u5BFE\u8C61\u5916\u3067\u3059\u3002",
       example: "-78\u2103 \u2192 -78 \xB0C"
     },
+    "pair-dash": {
+      summary: "\u5BFE\u7B49\u306A 2 \u3064\u306E\u3082\u306E\u3092\u7D50\u3076\u6A2A\u68D2\u3002\u30CF\u30A4\u30D5\u30F3\u3067\u306F\u306A\u304F en dash\uFF08\u2013\uFF09\u3092\u4F7F\u3044\u307E\u3059\u3002\u6587\u5B57\u306E\u4E26\u3073\u3060\u3051\u3067\u306F n-BuLi \u3084 well-known \u3068\u533A\u5225\u304C\u4ED8\u304B\u306A\u3044\u305F\u3081\u3001src/core/dict.ts \u306E EN_DASH_PAIRS \u306B\u8F09\u3063\u3066\u3044\u308B\u7D44\uFF08HOMO-LUMO\u3001Diels-Alder\u3001donor-acceptor \u306A\u3069\uFF09\u3060\u3051\u3092\u898B\u307E\u3059\u3002\u7814\u7A76\u5BA4\u3067\u4F7F\u3046\u7D44\u306F\u8FFD\u8A18\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
+      example: "HOMO-LUMO \u30AE\u30E3\u30C3\u30D7 \u2192 HOMO\u2013LUMO \u30AE\u30E3\u30C3\u30D7"
+    },
     "compound-hyphen": {
       summary: "\u5316\u5408\u7269\u540D\u306E\u4E2D\u306E\u6A2A\u68D2\u3002en dash \u3067\u306F\u306A\u304F\u30CF\u30A4\u30D5\u30F3\uFF08-\uFF09\u3092\u4F7F\u3044\u307E\u3059\u3002\u4E21\u5074\u304C\u5316\u5408\u7269\u540D\u3089\u3057\u3044\u3068\u304D\u3060\u3051\u898B\u308B\u306E\u3067\u3001HOMO\u2013LUMO \u3084 \u5316\u5408\u7269 a\u2013f \u306E\u3088\u3046\u306B en dash \u304C\u6B63\u3057\u3044\u7B87\u6240\u306F\u5BFE\u8C61\u5916\u3067\u3059\u3002",
       example: "2\u2013butanol \u2192 2-butanol\uFF0Fn\u2013BuLi \u2192 n-BuLi"
@@ -1154,9 +1234,10 @@
       example: "Figure 1\u306B\u793A\u3059 \u2192 Figure 1 \u306B\u793A\u3059"
     },
     "greek-cjk-space": {
-      summary: "\u30AE\u30EA\u30B7\u30E3\u6587\u5B57\u3068\u548C\u6587\u304C\u76F4\u63A5\u96A3\u308A\u5408\u3046\u7B87\u6240\u3002\u6295\u7A3F\u898F\u7A0B\u306B\u3088\u308A\u8981\u5426\u304C\u5206\u304B\u308C\u308B\u305F\u3081\u65E2\u5B9A\u3067\u306F\u7121\u52B9\u3067\u3059\u3002",
-      example: "\u03C0\u5171\u5F79 \u2192 \u03C0 \u5171\u5F79",
-      defaultEnabled: false
+      // 2026-07-29 に既定で有効へ。要否が投稿規程で分かれるのは変わらないが、
+      // 研究室の原稿では入れるほうが常だという利用者の判断。
+      summary: "\u30AE\u30EA\u30B7\u30E3\u6587\u5B57\u3068\u548C\u6587\u304C\u76F4\u63A5\u96A3\u308A\u5408\u3046\u7B87\u6240\u3002\u6295\u7A3F\u898F\u7A0B\u3067\u4E0D\u8981\u3068\u3055\u308C\u308B\u5834\u5408\u306F\u5916\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
+      example: "\u03C0\u5171\u5F79 \u2192 \u03C0 \u5171\u5F79"
     },
     "reagent-style": {
       summary: "\u8A66\u85AC\u306E\u7565\u8A18\u304C\u8907\u6570\u306E\u66F8\u304D\u65B9\u3067\u6DF7\u3056\u3063\u3066\u3044\u308B\u7B87\u6240\u3002\u6587\u66F8\u5185\u3067\u7D71\u4E00\u3057\u307E\u3059\u3002",
@@ -1208,8 +1289,8 @@
       example: "\u2026\u3092 Figure 1 \u306B\u793A\u3059\u3002\u306E\u300CFigure 1\u300D"
     },
     "compound-number-bold": {
-      summary: "\u5316\u5408\u7269\u756A\u53F7\u306F\u592A\u5B57\u306B\u3057\u307E\u3059\u3002\u6570\u5B57\u3060\u3051\u3067\u306F\u5224\u5225\u3067\u304D\u306A\u3044\u305F\u3081\u8A9E\u3092\u4F34\u3046\u5834\u5408\u306E\u307F\u898B\u307E\u3059\u3002",
-      example: "\u5316\u5408\u7269 1 \u306E\u300C1\u300D"
+      summary: "\u5316\u5408\u7269\u756A\u53F7\u306F\u592A\u5B57\u306B\u3057\u307E\u3059\u3002\u300C\u5316\u5408\u7269 1\u300D\u306E\u3088\u3046\u306B\u8A9E\u3092\u4F34\u3046\u3082\u306E\u306B\u52A0\u3048\u3066\u3001\u6587\u66F8\u5168\u4F53\u304B\u3089\u5316\u5408\u7269\u756A\u53F7\u3068\u5224\u65AD\u3067\u304D\u305F\u7CFB\u5217\u30E9\u30D9\u30EB\uFF081a\u30011a\u2013f \u306E 1a\u3001\u96FB\u8377\u4ED8\u304D\u306E 1b2\u2013 \u306E 1b\uFF09\u3082\u5BFE\u8C61\u3067\u3059\u3002\u88F8\u306E\u6570\u5B57\u306F\u5E74\u3084\u5DFB\u3068\u533A\u5225\u3067\u304D\u306A\u3044\u306E\u3067\u898B\u307E\u305B\u3093\u3002",
+      example: "\u5316\u5408\u7269 1 \u306E\u300C1\u300D\u30011a\u2013f \u306E\u300C1a\u300D"
     },
     // --- 2-(3) 参考文献 -------------------------------------------------------
     "citation-position": {
@@ -1231,6 +1312,18 @@
     "reference-journal-italic": {
       summary: "\u5F15\u7528\u6587\u732E\u306E\u8A8C\u540D\u306F\u659C\u4F53\u3002\u300C\u8A8C\u540D \u5E74, \u5DFB,\u300D\u306E\u4E26\u3073\u3060\u3051\u3092\u898B\u308B\u306E\u3067\u3001\u672C\u6587\u4E2D\u306E\u96D1\u8A8C\u540D\u306B\u306F\u53CD\u5FDC\u3057\u307E\u305B\u3093\u3002\u30A4\u30CB\u30B7\u30E3\u30EB \u59D3 \u306E\u9806\u3067\u8457\u8005\u3092\u66F8\u304D\u3001\u304B\u3064\u8A8C\u540D\u304C 1 \u6587\u5B57\u3067\u59CB\u307E\u308B\u5834\u5408\uFF08\u2026, H. Suzuki, J. Am. Chem. Soc. 2019\uFF09\u3060\u3051\u3001\u5148\u982D\u306E\u300CJ.\u300D\u3092\u8457\u8005\u306E\u30A4\u30CB\u30B7\u30E3\u30EB\u3068\u533A\u5225\u3067\u304D\u305A\u7BC4\u56F2\u304C\u77ED\u304F\u306A\u308A\u307E\u3059\u3002",
       example: "J. Am. Chem. Soc. 2019, 141, 1234. \u306E\u8A8C\u540D\u90E8\u5206"
+    },
+    "charge-superscript": {
+      summary: "\u9084\u5143\u7A2E\u30FB\u9178\u5316\u7A2E\u306E\u96FB\u8377\u304C\u4E0A\u4ED8\u304D\u306B\u306A\u3063\u3066\u3044\u306A\u3044\u7B87\u6240\uFF081b2\u2013 \u306E\u300C2\u2013\u300D\uFF09\u3002\u6587\u66F8\u304C\u5316\u5408\u7269\u756A\u53F7\u3068\u8A8D\u3081\u305F\u30E9\u30D9\u30EB\u306E\u76F4\u5F8C\u3060\u3051\u3092\u898B\u308B\u306E\u3067\u3001\u5F15\u304D\u7B97\u3084\u30DA\u30FC\u30B8\u7BC4\u56F2\u306B\u306F\u53CD\u5FDC\u3057\u307E\u305B\u3093\u3002",
+      example: "1b2\u2013 \u306E\u300C2\u2013\u300D\u3092\u4E0A\u4ED8\u304D\u306B"
+    },
+    "uncited-reference": {
+      summary: "\u6587\u732E\u30EA\u30B9\u30C8\u306B\u8F09\u3063\u3066\u3044\u308B\u306E\u306B\u3001\u672C\u6587\u306E\u3069\u3053\u304B\u3089\u3082\u5F15\u7528\u3055\u308C\u3066\u3044\u306A\u3044\u9805\u76EE\u3002\u5F15\u7528\u3092\u52A0\u3048\u308B\u304B\u3001\u30EA\u30B9\u30C8\u304B\u3089\u5916\u3057\u307E\u3059\u3002\u30EA\u30B9\u30C8\u81EA\u8EAB\u306E\u4E2D\u306E [1] \u306F\u5F15\u7528\u3068\u3057\u3066\u6570\u3048\u307E\u305B\u3093\u3002",
+      example: "[3] \u304C\u6587\u732E\u30EA\u30B9\u30C8\u306B\u3042\u308B\u304C\u3001\u672C\u6587\u306B [3] \u304C\u51FA\u3066\u3053\u306A\u3044"
+    },
+    "reference-year-bold": {
+      summary: "\u5F15\u7528\u6587\u732E\u306E\u5E74\u306F\u592A\u5B57\u3002ACS \u6D41\u3067\u306F \u8A8C\u540D\uFF08\u659C\u4F53\uFF09\u5E74\uFF08\u592A\u5B57\uFF09\u5DFB\uFF08\u659C\u4F53\uFF09\u306E\u9806\u3067\u3001\u5F37\u8ABF\u304C\u4E57\u308B\u306E\u306F\u5E74\u3067\u3059\u3002\u300C\u8A8C\u540D \u5E74, \u5DFB,\u300D\u306E\u4E26\u3073\u304B\u3089\u5E74\u3092\u7279\u5B9A\u3057\u307E\u3059\u3002\u3069\u3053\u3092\u5F37\u8ABF\u3059\u308B\u304B\u306F\u96D1\u8A8C\u306B\u3088\u308B\u305F\u3081\u3001\u78BA\u8A8D\u3068\u3057\u3066\u51FA\u3057\u307E\u3059\u3002",
+      example: "J. Am. Chem. Soc. 2019, 141, 1234. \u306E\u300C2019\u300D\u3092\u592A\u5B57\u306B"
     },
     "reference-volume-italic": {
       summary: "\u5F15\u7528\u6587\u732E\u306E\u5DFB\u306F\u659C\u4F53\u3002ACS \u6D41\u3067\u306F \u8A8C\u540D\uFF08\u659C\u4F53\uFF09\u5E74\uFF08\u592A\u5B57\uFF09\u5DFB\uFF08\u659C\u4F53\uFF09\u306E\u9806\u306A\u306E\u3067\u3001\u592A\u5B57\u306B\u3059\u308B\u306E\u306F\u5E74\u3067\u3001\u5DFB\u306F\u659C\u4F53\u3067\u3059\u3002\u540C\u3058\u304F\u300C\u8A8C\u540D \u5E74, \u5DFB,\u300D\u306E\u4E26\u3073\u304B\u3089\u5DFB\u3092\u7279\u5B9A\u3057\u307E\u3059\u3002\u3069\u3053\u3092\u5F37\u8ABF\u3059\u308B\u304B\u306F\u96D1\u8A8C\u306B\u3088\u308B\u305F\u3081\u3001\u78BA\u8A8D\u3068\u3057\u3066\u51FA\u3057\u307E\u3059\u3002",
@@ -1674,6 +1767,25 @@
     `(?<![A-Za-z0-9.])(\\d{1,4})([a-z])\\s*[\u2013\u2014\u2212-]\\s*(\\d{1,4})?([a-z])${LABEL_END}`,
     "gu"
   );
+  function labelRanges(text) {
+    const spans = [];
+    LABEL_RANGE.lastIndex = 0;
+    let m;
+    while ((m = LABEL_RANGE.exec(text)) !== null) {
+      spans.push({ start: m.index, text: m[0], base: `${m[1]}${m[2]}` });
+    }
+    return spans;
+  }
+  var FIGURE_LABEL = /(?:Fig(?:ures?|s?)?\.?|Tables?|Schemes?|Charts?|Eq(?:uations?|ns?)?\.?|Entry|Entries|Refs?\.?|図|表|式|スキーム|チャート)\s*$/iu;
+  var CONNECTOR = /^[\s,、and&+\-–—]*$/iu;
+  var FIGURE_LOOKBACK = 28;
+  function isFigureNumber(text, index) {
+    const before = text.slice(Math.max(0, index - FIGURE_LOOKBACK), index);
+    if (FIGURE_LABEL.test(before)) return true;
+    const viaConnector = /(\d+)([\s,、and&+\-–—]*)$/iu.exec(before);
+    if (!viaConnector || !CONNECTOR.test(viaConnector[2])) return false;
+    return FIGURE_LABEL.test(before.slice(0, before.length - viaConnector[0].length));
+  }
 
   // src/core/rules/figure.ts
   var LABELS = ["Figure", "Fig.", "Table", "Scheme", "Chart", "Equation", "Eq."];
@@ -1967,6 +2079,121 @@
     compoundOrderRule
   ];
 
+  // src/core/inventory.ts
+  var COMPOUND_LABEL2 = new RegExp(`(?<![A-Za-z0-9.])(\\d{1,4})([a-z])${LABEL_END}`, "gu");
+  var COMPOUND_RANGE = new RegExp(
+    `(?<![A-Za-z0-9.])(\\d{1,4})([a-z])\\s*[\u2013\u2014\u2212-]\\s*(\\d{1,4})?([a-z])${LABEL_END}`,
+    "gu"
+  );
+  var UNIT_AHEAD = new RegExp(
+    `^\\s*(?:${[...UNITS, "%"].sort((a, b) => b.length - a.length).map(escapeRegExp).join("|")})(?![A-Za-z0-9])`,
+    "u"
+  );
+  var BOLD_TOKEN = new RegExp(`(?<![A-Za-z0-9.])(\\d{1,4})([a-z])?${LABEL_END}`, "gu");
+  var NUMBER_RUN = /\d+/gu;
+  var RANGE_SEPARATOR2 = /[–—−-]/u;
+  function citedNumbers(marker) {
+    const inner = marker.slice(1, -1);
+    const numbers = [...matchAll(NUMBER_RUN, inner)];
+    const cited = [];
+    numbers.forEach((m, i) => {
+      const value = Number(m[0]);
+      if (i === 0) {
+        cited.push(value);
+        return;
+      }
+      const previous = numbers[i - 1];
+      const between = inner.slice(previous.index + previous[0].length, m.index);
+      if (RANGE_SEPARATOR2.test(between)) {
+        for (let n = Number(previous[0]) + 1; n <= value; n += 1) cited.push(n);
+      } else {
+        cited.push(value);
+      }
+    });
+    return [...new Set(cited)].sort((a, b) => a - b);
+  }
+
+  // src/core/references.ts
+  var HEADING = /^\s*(?:\d+[.．]?\s*)?(?:references?|bibliography|literature\s+cited|参考文献|引用文献|文\s*献)\s*[:：]?\s*$/iu;
+  var LEADING_NUMBER = /^\s*(?:\(\s*(\d{1,3})\s*\)|(\d{1,3})\s*[.．)]）?)\s*/u;
+  var BRACKET_MARKER = /\[\s*(\d{1,3})\s*\]/gu;
+  var MIN_ENTRY_LENGTH = 8;
+  function splitEntries(text) {
+    var _a;
+    const markers = [...matchAll(BRACKET_MARKER, text)].filter(
+      (m2) => {
+        var _a2;
+        return m2.index === 0 || !/[A-Za-z0-9]/u.test((_a2 = text[m2.index - 1]) != null ? _a2 : "");
+      }
+    );
+    const accepted = [];
+    let highest = 0;
+    for (const m2 of markers) {
+      const number2 = Number(m2[1]);
+      if (number2 <= highest) continue;
+      accepted.push({ index: m2.index, marker: m2[0], number: number2 });
+      highest = number2;
+    }
+    if (accepted.length > 0) {
+      const entries = [];
+      accepted.forEach((marker, i) => {
+        var _a2, _b;
+        const from = marker.index + marker.marker.length;
+        const to = (_b = (_a2 = accepted[i + 1]) == null ? void 0 : _a2.index) != null ? _b : text.length;
+        const body2 = text.slice(from, to).trim();
+        if (body2.length < MIN_ENTRY_LENGTH) return;
+        entries.push({ number: marker.number, text: body2, start: marker.index, marker: marker.marker });
+      });
+      return entries;
+    }
+    const m = LEADING_NUMBER.exec(text);
+    if (!m) return [];
+    const number = Number((_a = m[1]) != null ? _a : m[2]);
+    const body = text.slice(m[0].length).trim();
+    if (!Number.isFinite(number) || number < 1 || body.length < MIN_ENTRY_LENGTH) return [];
+    return [{ number, text: body, start: 0, marker: m[0].trim() }];
+  }
+  function parseBibliography(paragraphs) {
+    let headingAt = -1;
+    paragraphs.forEach((text, i) => {
+      if (HEADING.test(text)) headingAt = i;
+    });
+    const from = (start2) => {
+      const entries2 = [];
+      for (let i = start2; i < paragraphs.length; i += 1) {
+        for (const entry of splitEntries(paragraphs[i])) entries2.push({ ...entry, paragraphIndex: i });
+      }
+      return entries2;
+    };
+    if (headingAt >= 0) {
+      const entries2 = from(headingAt + 1);
+      if (entries2.length > 0) return entries2;
+    }
+    let start = paragraphs.length;
+    for (let i = paragraphs.length - 1; i >= 0; i -= 1) {
+      const text = paragraphs[i];
+      if (text.trim().length === 0) continue;
+      if (splitEntries(text).length === 0) break;
+      start = i;
+    }
+    const entries = from(start);
+    return entries.length >= 2 ? entries : [];
+  }
+  var BRACKET_CITATION = /\[\s*\d+(?:\s*[,、–—−-]\s*\d+)*\s*\]/gu;
+  function bibliographyParagraphs(entries) {
+    return new Set(entries.map((entry) => entry.paragraphIndex));
+  }
+  function bodyCitations(paragraphs, skip) {
+    const hits = [];
+    paragraphs.forEach((text, paragraphIndex) => {
+      if (skip.has(paragraphIndex)) return;
+      for (const m of matchAll(BRACKET_CITATION, text)) {
+        hits.push({ paragraphIndex, start: m.index, text: m[0] });
+      }
+    });
+    return hits;
+  }
+
   // src/core/rules/reference.ts
   var CITATION = /\[\s*\d+(?:\s*[,–\-]\s*\d+)*\s*\]/u;
   var CITATION_SOURCE = CITATION.source;
@@ -2109,8 +2336,14 @@
       return found;
     }
   };
-  var SURNAME_FIRST = /(?<![A-Z]\.\s)\b([A-Z][a-z]+),\s*([A-Z]\.(?:\s*[A-Z]\.)*)/gu;
+  var SURNAME_FIRST = /\b([A-Z][a-z]+),\s*([A-Z]\.(?:\s*[A-Z]\.)*)/gu;
   var INITIALS_FIRST = /\b([A-Z]\.(?:\s*[A-Z]\.)*)\s+([A-Z][a-z]+)\b(?!\.)/gu;
+  var AUTHOR_LOOKBACK = 40;
+  function initialsPrecede(text, index) {
+    const before = text.slice(Math.max(0, index - AUTHOR_LOOKBACK), index);
+    const separator = Math.max(before.lastIndexOf(","), before.lastIndexOf(";"));
+    return /[A-Z]\./u.test(before.slice(separator + 1));
+  }
   var authorOrderRule = {
     id: "author-order",
     category: "reference",
@@ -2121,6 +2354,7 @@
       const initialsFirst = [];
       paragraphs.forEach((text, paragraphIndex) => {
         for (const m of matchAll(SURNAME_FIRST, text)) {
+          if (initialsPrecede(text, m.index)) continue;
           surnameFirst.push({ paragraphIndex, start: m.index, text: m[0] });
         }
         for (const m of matchAll(INITIALS_FIRST, text)) {
@@ -2142,12 +2376,37 @@
       );
     }
   };
+  var uncitedReferenceRule = {
+    id: "uncited-reference",
+    category: "reference",
+    title: "\u5F15\u7528\u3055\u308C\u3066\u3044\u306A\u3044\u6587\u732E",
+    kind: "document",
+    run(paragraphs) {
+      const entries = parseBibliography(paragraphs);
+      if (entries.length === 0) return [];
+      const inList = bibliographyParagraphs(entries);
+      const cited = /* @__PURE__ */ new Set();
+      for (const hit of bodyCitations(paragraphs, inList)) {
+        for (const number of citedNumbers(hit.text)) cited.add(number);
+      }
+      return entries.filter((entry) => !cited.has(entry.number)).map(
+        (entry) => finding(uncitedReferenceRule, {
+          severity: "note",
+          paragraphIndex: entry.paragraphIndex,
+          start: entry.start,
+          matched: entry.marker,
+          message: `\u6587\u732E ${entry.number} \u306F\u672C\u6587\u306E\u3069\u3053\u304B\u3089\u3082\u5F15\u7528\u3055\u308C\u3066\u3044\u307E\u305B\u3093\u3002\u5F15\u7528\u3092\u52A0\u3048\u308B\u304B\u3001\u30EA\u30B9\u30C8\u304B\u3089\u5916\u3057\u3066\u304F\u3060\u3055\u3044\u3002`
+        })
+      );
+    }
+  };
   var REFERENCE_RULES = [
     citationPositionRule,
     journalAbbrevRule,
     journalConsistencyRule,
     citationStyleRule,
-    authorOrderRule
+    authorOrderRule,
+    uncitedReferenceRule
   ];
 
   // src/core/engine.ts
@@ -2366,12 +2625,44 @@
     );
   }
   function journalNameProbes(text) {
-    return referenceEntries(text).map((m) => ({
-      start: m.index,
-      end: m.index + m[1].length,
-      text: m[1],
-      reason: `\u5F15\u7528\u6587\u732E\u306E\u8A8C\u540D\u300C${m[1]}\u300D\u306F\u659C\u4F53\u306B\u3057\u307E\u3059`
-    }));
+    return referenceEntries(text).map((m) => {
+      const name = m[1].replace(/\.$/u, "");
+      return {
+        start: m.index,
+        end: m.index + name.length,
+        text: name,
+        reason: `\u5F15\u7528\u6587\u732E\u306E\u8A8C\u540D\u300C${m[1]}\u300D\u306F\u659C\u4F53\u306B\u3057\u307E\u3059`
+      };
+    });
+  }
+  function chargeProbes(text, labels) {
+    const probes = [];
+    for (const label of labels) {
+      const pattern = new RegExp(`(?<![A-Za-z0-9.])${label}(\\d{1,2}\\s*[\u2013\u2014\u2212+])`, "gu");
+      for (const m of matchAll(pattern, text)) {
+        const charge = m[1];
+        const start = m.index + label.length;
+        probes.push({
+          start,
+          end: start + charge.length,
+          text: charge,
+          reason: `\u5316\u5408\u7269 ${label} \u306E\u96FB\u8377\u300C${charge.trim()}\u300D\u306F\u4E0A\u4ED8\u304D\u306B\u3057\u307E\u3059`
+        });
+      }
+    }
+    return probes.sort((a, b) => a.start - b.start);
+  }
+  function yearProbes(text) {
+    return referenceEntries(text).map((m) => {
+      const year = m[2];
+      const start = m.index + m[0].indexOf(year, m[1].length);
+      return {
+        start,
+        end: start + year.length,
+        text: year,
+        reason: `\u5F15\u7528\u6587\u732E\u306E\u5E74\u300C${year}\u300D\u306F\u592A\u5B57\u306B\u3057\u307E\u3059`
+      };
+    });
   }
   function volumeNumberProbes(text) {
     return referenceEntries(text).map((m) => {
@@ -2386,19 +2677,45 @@
     });
   }
   var COMPOUND_NUMBER = /(?:compounds?|化合物)\s*(\d+[a-z]?)/giu;
-  function compoundNumberProbes(text) {
-    const probes = [];
+  function compoundNumberProbes(text, labels = /* @__PURE__ */ new Set()) {
+    const probes = /* @__PURE__ */ new Map();
     for (const m of matchAll(COMPOUND_NUMBER, text)) {
       const digits = m[1];
       const start = m.index + m[0].lastIndexOf(digits);
-      probes.push({
+      probes.set(start, {
         start,
         end: start + digits.length,
         text: digits,
         reason: `\u5316\u5408\u7269\u756A\u53F7\u300C${digits}\u300D\u306F\u592A\u5B57\u306B\u3057\u307E\u3059`
       });
     }
-    return probes;
+    const covered = [];
+    for (const span of labelRanges(text)) {
+      if (!labels.has(span.base)) continue;
+      if (isFigureNumber(text, span.start)) continue;
+      covered.push({ start: span.start, end: span.start + span.text.length });
+      probes.set(span.start, {
+        start: span.start,
+        end: span.start + span.text.length,
+        text: span.text,
+        reason: `\u5316\u5408\u7269\u756A\u53F7\u300C${span.text}\u300D\u306F\u592A\u5B57\u306B\u3057\u307E\u3059`
+      });
+    }
+    const inRange = (start) => covered.some((span) => start >= span.start && start < span.end);
+    for (const label of labels) {
+      const pattern = new RegExp(`(?<![A-Za-z0-9.])${label}${LABEL_END}`, "gu");
+      for (const m of matchAll(pattern, text)) {
+        if (probes.has(m.index) || inRange(m.index)) continue;
+        if (isFigureNumber(text, m.index)) continue;
+        probes.set(m.index, {
+          start: m.index,
+          end: m.index + label.length,
+          text: label,
+          reason: `\u5316\u5408\u7269\u756A\u53F7\u300C${label}\u300D\u306F\u592A\u5B57\u306B\u3057\u307E\u3059`
+        });
+      }
+    }
+    return [...probes.values()].sort((a, b) => a.start - b.start);
   }
 
   // src/office/formatChecks.ts
@@ -2490,11 +2807,26 @@
       category: "figure",
       title: "\u5316\u5408\u7269\u756A\u53F7\u306F\u592A\u5B57",
       probe: compoundNumberProbes,
-      load: "bold",
+      // 上付きも読むのは、それが化合物番号かどうかの判定に要るから。
+      // 「ジラジカル化合物⁸⁸と」 の 88 は文献 88 で、本文だけ見ると
+      // 「化合物 88」 と区別が付かない。数字が上がっていることだけが証拠になる。
+      load: "bold, superscript",
       severity: "confirm",
-      verdict: (font, probe) => font.bold ? null : probe.reason,
+      verdict: (font, probe) => font.superscript || font.bold ? null : probe.reason,
       fix: (font) => {
         font.bold = true;
+      }
+    },
+    {
+      id: "charge-superscript",
+      category: "figure",
+      title: "\u5316\u5408\u7269\u306E\u96FB\u8377\u306F\u4E0A\u4ED8\u304D",
+      probe: chargeProbes,
+      load: "superscript",
+      severity: "fix",
+      verdict: (font, probe) => font.superscript ? null : probe.reason,
+      fix: (font) => {
+        font.superscript = true;
       }
     },
     {
@@ -2509,6 +2841,19 @@
       verdict: (font, probe) => font.italic ? null : probe.reason,
       fix: (font) => {
         font.italic = true;
+      }
+    },
+    {
+      id: "reference-year-bold",
+      category: "reference",
+      title: "\u5F15\u7528\u6587\u732E\u306E\u5E74\u306F\u592A\u5B57",
+      probe: yearProbes,
+      load: "bold",
+      // 誌名の書式と同じく、どの語を強調するかは投稿規程で決まるので確認扱い。
+      severity: "confirm",
+      verdict: (font, probe) => font.bold ? null : probe.reason,
+      fix: (font) => {
+        font.bold = true;
       }
     },
     {
@@ -2572,7 +2917,11 @@
 
   // src/taskpane/prefs.ts
   var KEY = "document-corrector.prefs.v1";
-  var DEFAULTS_VERSION = 1;
+  var DEFAULTS_VERSION = 2;
+  var NEWLY_DEFAULT_ON = Object.freeze([
+    "greek-cjk-space"
+    // DEFAULTS_VERSION 2
+  ]);
   var DEFAULT_SPACE_COLOR = "#80DEEA";
   var DEFAULT_PREFERENCES = Object.freeze({
     defaultsVersion: DEFAULTS_VERSION,
@@ -2583,7 +2932,8 @@
     selectionOnly: false,
     trackChanges: false,
     markerColors: Object.freeze({}),
-    spaceColor: DEFAULT_SPACE_COLOR
+    halfSpaceColor: DEFAULT_SPACE_COLOR,
+    fullSpaceColor: DEFAULT_SPACE_COLOR
   });
   function markerColor(prefs2, category) {
     var _a;
@@ -2596,8 +2946,9 @@
     return { ...prefs2, markerColors: colors };
   }
   function normalize2(raw) {
-    var _a;
+    var _a, _b, _c, _d;
     const source = raw != null ? raw : {};
+    const legacySpaceColor = source.spaceColor;
     const strings = (value, fallback) => Array.isArray(value) ? value.filter((v) => typeof v === "string") : fallback;
     const length = Number(source.maxSentenceLength);
     const font = typeof source.bodyFont === "string" ? source.bodyFont.trim() : "";
@@ -2611,7 +2962,10 @@
       selectionOnly: source.selectionOnly === true,
       trackChanges: source.trackChanges === true,
       markerColors: markerColors(source.markerColors),
-      spaceColor: (_a = paletteColor(source.spaceColor)) != null ? _a : DEFAULT_SPACE_COLOR
+      // `spaceColor` is the setting saved by versions before half/full-width
+      // spaces were independently configurable. It remains the migration fallback.
+      halfSpaceColor: (_b = paletteColor((_a = source.halfSpaceColor) != null ? _a : legacySpaceColor)) != null ? _b : DEFAULT_SPACE_COLOR,
+      fullSpaceColor: (_d = paletteColor((_c = source.fullSpaceColor) != null ? _c : legacySpaceColor)) != null ? _d : DEFAULT_SPACE_COLOR
     };
   }
   function markerColors(raw) {
@@ -2634,10 +2988,13 @@
   }
   function migrate(prefs2) {
     if (prefs2.defaultsVersion >= DEFAULTS_VERSION) return prefs2;
+    const turnedOn = new Set(NEWLY_DEFAULT_ON);
     return {
       ...prefs2,
       defaultsVersion: DEFAULTS_VERSION,
-      disabledRules: [.../* @__PURE__ */ new Set([...prefs2.disabledRules, ...DEFAULT_DISABLED_RULES])],
+      disabledRules: [.../* @__PURE__ */ new Set([...prefs2.disabledRules, ...DEFAULT_DISABLED_RULES])].filter(
+        (id) => !turnedOn.has(id)
+      ),
       disabledEntries: [.../* @__PURE__ */ new Set([...prefs2.disabledEntries, ...DEFAULT_DISABLED_ENTRIES])]
     };
   }
@@ -2661,6 +3018,66 @@
       store.setItem(KEY, JSON.stringify(prefs2));
     } catch {
     }
+  }
+
+  // src/core/version.ts
+  var VERSION = /^\d+(?:\.\d+){0,3}$/u;
+  function parseVersion(text) {
+    const trimmed = (text != null ? text : "").trim();
+    if (!VERSION.test(trimmed)) return null;
+    const parts = trimmed.split(".").map(Number);
+    while (parts.length < 4) parts.push(0);
+    return { parts, text: trimmed };
+  }
+  function compareVersions(a, b) {
+    var _a, _b;
+    for (let i = 0; i < 4; i += 1) {
+      const difference = ((_a = a.parts[i]) != null ? _a : 0) - ((_b = b.parts[i]) != null ? _b : 0);
+      if (difference !== 0) return difference;
+    }
+    return 0;
+  }
+  function isOutdated(installed, latest) {
+    const newest = parseVersion(latest);
+    if (!newest) return false;
+    const current = parseVersion(installed);
+    if (!current) return true;
+    return compareVersions(current, newest) < 0;
+  }
+  function parseVersionInfo(raw) {
+    if (raw === null || typeof raw !== "object") return null;
+    const source = raw;
+    const manifestVersion = typeof source.manifestVersion === "string" ? source.manifestVersion : "";
+    if (parseVersion(manifestVersion) === null) return null;
+    return {
+      manifestVersion,
+      ...typeof source.url === "string" && source.url.length > 0 ? { url: source.url } : {},
+      ...typeof source.note === "string" && source.note.length > 0 ? { note: source.note } : {}
+    };
+  }
+  var VERSION_URL = "version.json";
+  async function fetchVersionInfo() {
+    try {
+      const response = await fetch(VERSION_URL, { cache: "no-store" });
+      if (!response.ok) return null;
+      return parseVersionInfo(await response.json());
+    } catch {
+      return null;
+    }
+  }
+  function versionLine(installed, latest) {
+    var _a;
+    const current = parseVersion(installed);
+    const newest = parseVersion(latest);
+    const notes = [];
+    if (!current) notes.push("\u3053\u306E\u4ED5\u7D44\u307F\u3088\u308A\u524D\u306E\u7248");
+    if (newest) notes.push(isOutdated(installed, latest) ? `\u6700\u65B0\u306F ${newest.text}` : "\u6700\u65B0\u7248\u3067\u3059");
+    const shown = (_a = current == null ? void 0 : current.text) != null ? _a : "\u4E0D\u660E";
+    return notes.length === 0 ? `\u30D0\u30FC\u30B8\u30E7\u30F3 ${shown}` : `\u30D0\u30FC\u30B8\u30E7\u30F3 ${shown}\uFF08${notes.join("\u3002")}\uFF09`;
+  }
+  function installedVersion(search) {
+    const value = new URLSearchParams(search).get("v");
+    return value && value.length > 0 ? value : null;
   }
 
   // src/dialog/bridge.ts
@@ -2741,12 +3158,22 @@
       byId(id).onchange = readPrefsFromInputs;
     }
     byId("color-reset").onclick = () => {
-      apply({ markerColors: DEFAULT_PREFERENCES.markerColors, spaceColor: DEFAULT_SPACE_COLOR });
+      apply({ markerColors: DEFAULT_PREFERENCES.markerColors });
       renderColors();
     };
     byId("settings-done").onclick = () => send(true);
     renderColors();
+    showVersion();
   });
+  function showVersion() {
+    void (async () => {
+      const info = await fetchVersionInfo();
+      byId("version-line").textContent = versionLine(
+        installedVersion(location.search),
+        info == null ? void 0 : info.manifestVersion
+      );
+    })();
+  }
   function apply(patch) {
     updatePreferences(patch);
   }
@@ -2776,13 +3203,6 @@
         })
       );
     }
-    const others = byId("other-colors");
-    others.innerHTML = "";
-    others.appendChild(
-      colorRow("\u30B9\u30DA\u30FC\u30B9\u306E\u5F37\u8ABF\uFF08\u5168\u30B9\u30DA\u30FC\u30B9\u5F37\u8ABF\uFF09", preferences().spaceColor, (value) => {
-        apply({ spaceColor: value });
-      })
-    );
   }
   function colorRow(label, value, onchange) {
     const row = document.createElement("div");
