@@ -8,8 +8,8 @@
   xsi:type="TaskPaneApp">
 
   <Id>A0DEE6AC-C702-48D0-A88F-31E286D7B22C</Id>
-  <Version>1.16.0.24</Version>
-  <!-- RELEASE_NOTE: リボンのアイコンを描き直し、化合物一覧の表示と画像メモを見直しました。 -->
+  <Version>1.17.0.1</Version>
+  <!-- RELEASE_NOTE: リボンを整理しました。［ルール設定］は［設定］のタブに入り、［設定］は［反映を削除］の隣へ。［結果を表示］は［文書をチェック］のメニューの「チェックせず前回の結果を表示」になりました。パネルは最初に［使い方］を開き、リボンのボタンの説明を載せています。あわせて、「2p 軌道」などの原子軌道を化合物番号として数えていた誤りを直しました。 -->
   <ProviderName>Fukazawa Lab</ProviderName>
   <DefaultLocale>ja-JP</DefaultLocale>
   <DisplayName DefaultValue="Document Corrector" />
@@ -18,8 +18,8 @@
        <Version> と同じ値にしておく。最初に公開したときここは 1×1 の
        透明 PNG（仮置き）で、Word はそれを憶えてしまい、あとから本物の
        絵を置いても取り直さなかった。URL が変われば取り直す。 -->
-  <IconUrl DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-32.png?v=1.16.0.24" />
-  <HighResolutionIconUrl DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-80.png?v=1.16.0.24" />
+  <IconUrl DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-32.png?v=1.17.0.1" />
+  <HighResolutionIconUrl DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-80.png?v=1.17.0.1" />
   <SupportUrl DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/index.html" />
 
   <AppDomains>
@@ -31,7 +31,7 @@
   </Hosts>
 
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/taskpane.html?v=1.16.0.24" />
+    <SourceLocation DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/taskpane.html?v=1.17.0.1" />
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>
@@ -65,8 +65,11 @@
           <ExtensionPoint xsi:type="PrimaryCommandSurface">
             <CustomTab id="DocumentCorrector.Tab">
               <!--
-                Word draws dividers between groups. Only the paired commands separated
-                by a full-width space in the requested layout share the same group.
+                Word draws a divider between groups, so a group is a claim that
+                what follows is a different kind of work.
+
+                点検と、その結果を原稿に書き込む操作は一続きなので、区切り線を
+                挟まずひとつのグループにまとめてある。
               -->
               <Group id="DocumentCorrector.Group.Main">
                 <Label resid="Main.Label" />
@@ -75,7 +78,12 @@
                   <bt:Image size="32" resid="Icon.Review.32" />
                   <bt:Image size="80" resid="Icon.Review.80" />
                 </Icon>
-                <Control xsi:type="Button" id="DocumentCorrector.Review">
+                <!--
+                  ［文書をチェック］がメニューなのは、点検せずに前回の結果へ戻る
+                  道を同じ場所に置くため。以前は［結果を表示］という別ボタンで、
+                  押すと点検が始まるのかどうかが名前から読めなかった。
+                -->
+                <Control xsi:type="Menu" id="DocumentCorrector.ReviewMenu">
                   <Label resid="Review.Label" />
                   <Supertip>
                     <Title resid="Review.Label" />
@@ -86,36 +94,42 @@
                     <bt:Image size="32" resid="Icon.Review.32" />
                     <bt:Image size="80" resid="Icon.Review.80" />
                   </Icon>
-                  <Action xsi:type="ExecuteFunction">
-                    <FunctionName>runReview</FunctionName>
-                  </Action>
+                  <Items>
+                    <Item id="DocumentCorrector.Review">
+                      <Label resid="RunReview.Label" />
+                      <Supertip>
+                        <Title resid="RunReview.Label" />
+                        <Description resid="RunReview.Tooltip" />
+                      </Supertip>
+                      <Icon>
+                        <bt:Image size="16" resid="Icon.Review.16" />
+                        <bt:Image size="32" resid="Icon.Review.32" />
+                        <bt:Image size="80" resid="Icon.Review.80" />
+                      </Icon>
+                      <Action xsi:type="ExecuteFunction">
+                        <FunctionName>runReview</FunctionName>
+                      </Action>
+                    </Item>
+                    <!-- ExecuteFunction であって ShowTaskpane ではない。パネルが
+                         開いたままだと ShowTaskpane は何も起こらず、図・表などの
+                         一覧を出しているときに指摘一覧へ戻れなかった。 -->
+                    <Item id="DocumentCorrector.Panel">
+                      <Label resid="Panel.Label" />
+                      <Supertip>
+                        <Title resid="Panel.Label" />
+                        <Description resid="Panel.Tooltip" />
+                      </Supertip>
+                      <Icon>
+                        <bt:Image size="16" resid="Icon.Panel.16" />
+                        <bt:Image size="32" resid="Icon.Panel.32" />
+                        <bt:Image size="80" resid="Icon.Panel.80" />
+                      </Icon>
+                      <Action xsi:type="ExecuteFunction">
+                        <FunctionName>showLastResult</FunctionName>
+                      </Action>
+                    </Item>
+                  </Items>
                 </Control>
-              <!-- ShowTaskpane is deliberately after the first two actions:
-                   it reopens a closed result pane without starting a new scan. -->
-                <Control xsi:type="Button" id="DocumentCorrector.Panel">
-                  <Label resid="Panel.Label" />
-                  <Supertip>
-                    <Title resid="Panel.Label" />
-                    <Description resid="Panel.Tooltip" />
-                  </Supertip>
-                  <Icon>
-                    <bt:Image size="16" resid="Icon.Panel.16" />
-                    <bt:Image size="32" resid="Icon.Panel.32" />
-                    <bt:Image size="80" resid="Icon.Panel.80" />
-                  </Icon>
-                  <Action xsi:type="ShowTaskpane">
-                    <TaskpaneId>DocumentCorrector.Taskpane</TaskpaneId>
-                    <SourceLocation resid="Taskpane.Url" />
-                  </Action>
-                </Control>
-              </Group>
-              <Group id="DocumentCorrector.Group.Apply">
-                <Label resid="ApplyFindings.Label" />
-                <Icon>
-                  <bt:Image size="16" resid="Icon.Marker.16" />
-                  <bt:Image size="32" resid="Icon.Marker.32" />
-                  <bt:Image size="80" resid="Icon.Marker.80" />
-                </Icon>
                 <Control xsi:type="Menu" id="DocumentCorrector.ApplyFindings">
                   <Label resid="ApplyFindings.Label" />
                   <Supertip>
@@ -194,26 +208,22 @@
                     </Item>
                   </Items>
                 </Control>
-              </Group>
-              <Group id="DocumentCorrector.Group.Rules">
-                <Label resid="Rules.Label" />
-                <Icon>
-                  <bt:Image size="16" resid="Icon.Rules.16" />
-                  <bt:Image size="32" resid="Icon.Rules.32" />
-                  <bt:Image size="80" resid="Icon.Rules.80" />
-                </Icon>
-                <Control xsi:type="Button" id="DocumentCorrector.Rules">
-                  <Label resid="Rules.Label" />
+                <!-- ［設定］はここ。点検の前後に触るものなので、一覧の並びの
+                     向こう側ではなく［反映を削除］の隣に、区切り線なしで置く。 -->
+                <Control xsi:type="Button" id="DocumentCorrector.Settings">
+                  <Label resid="Settings.Label" />
                   <Supertip>
-                    <Title resid="Rules.Label" />
-                    <Description resid="Rules.Tooltip" />
+                    <Title resid="Settings.Label" />
+                    <Description resid="Settings.Tooltip" />
                   </Supertip>
                   <Icon>
-                    <bt:Image size="16" resid="Icon.Rules.16" />
-                    <bt:Image size="32" resid="Icon.Rules.32" />
-                    <bt:Image size="80" resid="Icon.Rules.80" />
+                    <bt:Image size="16" resid="Icon.Settings.16" />
+                    <bt:Image size="32" resid="Icon.Settings.32" />
+                    <bt:Image size="80" resid="Icon.Settings.80" />
                   </Icon>
-                  <Action xsi:type="ExecuteFunction"><FunctionName>openRules</FunctionName></Action>
+                  <Action xsi:type="ExecuteFunction">
+                    <FunctionName>openSettings</FunctionName>
+                  </Action>
                 </Control>
               </Group>
               <Group id="DocumentCorrector.Group.Fonts">
@@ -327,29 +337,6 @@
                   </Action>
                 </Control>
               </Group>
-              <Group id="DocumentCorrector.Group.Settings">
-                <Label resid="Settings.Label" />
-                <Icon>
-                  <bt:Image size="16" resid="Icon.Settings.16" />
-                  <bt:Image size="32" resid="Icon.Settings.32" />
-                  <bt:Image size="80" resid="Icon.Settings.80" />
-                </Icon>
-                <Control xsi:type="Button" id="DocumentCorrector.Settings">
-                  <Label resid="Settings.Label" />
-                  <Supertip>
-                    <Title resid="Settings.Label" />
-                    <Description resid="Settings.Tooltip" />
-                  </Supertip>
-                  <Icon>
-                    <bt:Image size="16" resid="Icon.Settings.16" />
-                    <bt:Image size="32" resid="Icon.Settings.32" />
-                    <bt:Image size="80" resid="Icon.Settings.80" />
-                  </Icon>
-                  <Action xsi:type="ExecuteFunction">
-                    <FunctionName>openSettings</FunctionName>
-                  </Action>
-                </Control>
-              </Group>
               <Label resid="Tab.Label" />
             </CustomTab>
           </ExtensionPoint>
@@ -364,15 +351,12 @@
         <!-- Word caches ribbon images by URL.  Whenever an icon is redrawn,
              stamp its three URLs with the current Version, just as the add-in
              icon above does; without that Word keeps showing the old picture. -->
-        <bt:Image id="Icon.Panel.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-panel-16.png?v=1.16.0.24" />
-        <bt:Image id="Icon.Panel.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-panel-32.png?v=1.16.0.24" />
-        <bt:Image id="Icon.Panel.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-panel-80.png?v=1.16.0.24" />
-        <bt:Image id="Icon.Review.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-review-16.png?v=1.16.0.24" />
-        <bt:Image id="Icon.Review.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-review-32.png?v=1.16.0.24" />
-        <bt:Image id="Icon.Review.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-review-80.png?v=1.16.0.24" />
-        <bt:Image id="Icon.Rules.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-rules-16.png?v=1.16.0.24" />
-        <bt:Image id="Icon.Rules.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-rules-32.png?v=1.16.0.24" />
-        <bt:Image id="Icon.Rules.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-rules-80.png?v=1.16.0.24" />
+        <bt:Image id="Icon.Panel.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-panel-16.png?v=1.17.0.1" />
+        <bt:Image id="Icon.Panel.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-panel-32.png?v=1.17.0.1" />
+        <bt:Image id="Icon.Panel.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-panel-80.png?v=1.17.0.1" />
+        <bt:Image id="Icon.Review.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-review-16.png?v=1.17.0.1" />
+        <bt:Image id="Icon.Review.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-review-32.png?v=1.17.0.1" />
+        <bt:Image id="Icon.Review.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-review-80.png?v=1.17.0.1" />
         <bt:Image id="Icon.Marker.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-marker-16.png" />
         <bt:Image id="Icon.Marker.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-marker-32.png" />
         <bt:Image id="Icon.Marker.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-marker-80.png" />
@@ -397,29 +381,29 @@
         <bt:Image id="Icon.Settings.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-settings-16.png" />
         <bt:Image id="Icon.Settings.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-settings-32.png" />
         <bt:Image id="Icon.Settings.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-settings-80.png" />
-        <bt:Image id="Icon.Compounds.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-compounds-16.png?v=1.16.0.24" />
-        <bt:Image id="Icon.Compounds.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-compounds-32.png?v=1.16.0.24" />
-        <bt:Image id="Icon.Compounds.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-compounds-80.png?v=1.16.0.24" />
-        <bt:Image id="Icon.References.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-references-16.png?v=1.16.0.24" />
-        <bt:Image id="Icon.References.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-references-32.png?v=1.16.0.24" />
-        <bt:Image id="Icon.References.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-references-80.png?v=1.16.0.24" />
+        <bt:Image id="Icon.Compounds.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-compounds-16.png?v=1.17.0.1" />
+        <bt:Image id="Icon.Compounds.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-compounds-32.png?v=1.17.0.1" />
+        <bt:Image id="Icon.Compounds.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-compounds-80.png?v=1.17.0.1" />
+        <bt:Image id="Icon.References.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-references-16.png?v=1.17.0.1" />
+        <bt:Image id="Icon.References.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-references-32.png?v=1.17.0.1" />
+        <bt:Image id="Icon.References.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-references-80.png?v=1.17.0.1" />
         <bt:Image id="Icon.Figures.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-figures-16.png" />
         <bt:Image id="Icon.Figures.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-figures-32.png" />
         <bt:Image id="Icon.Figures.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-figures-80.png" />
-        <bt:Image id="Icon.Fonts.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-fonts-16.png?v=1.16.0.24" />
-        <bt:Image id="Icon.Fonts.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-fonts-32.png?v=1.16.0.24" />
-        <bt:Image id="Icon.Fonts.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-fonts-80.png?v=1.16.0.24" />
+        <bt:Image id="Icon.Fonts.16" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-fonts-16.png?v=1.17.0.1" />
+        <bt:Image id="Icon.Fonts.32" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-fonts-32.png?v=1.17.0.1" />
+        <bt:Image id="Icon.Fonts.80" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/assets/icon-fonts-80.png?v=1.17.0.1" />
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/taskpane.html?v=1.16.0.24" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/taskpane.html?v=1.17.0.1" />
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://t-shiokawa1.github.io/Document-Corrector/index.html" />
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="Tab.Label" DefaultValue="Corrector" />
         <bt:String id="Main.Label" DefaultValue="開始・反映" />
-        <bt:String id="Panel.Label" DefaultValue="結果を表示" />
         <bt:String id="Review.Label" DefaultValue="文書をチェック" />
-        <bt:String id="Rules.Label" DefaultValue="ルール設定" />
+        <bt:String id="RunReview.Label" DefaultValue="いま点検する" />
+        <bt:String id="Panel.Label" DefaultValue="チェックせず前回の結果を表示" />
         <bt:String id="ApplyFindings.Label" DefaultValue="指摘を反映" />
         <bt:String id="Cleanup.Label" DefaultValue="反映を削除" />
         <bt:String id="Help.Label" DefaultValue="使い方" />
@@ -437,13 +421,13 @@
         <bt:String id="GetStarted.Title" DefaultValue="Document Corrector を開きました" />
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="Panel.Tooltip" DefaultValue="閉じた結果パネルを開き直します。点検をやり直さずに、直前の指摘一覧へ戻れます。" />
-        <bt:String id="Review.Tooltip" DefaultValue="文章添削チェックリストに沿って文書を点検し、指摘をパネルに一覧します。パネルが閉じていれば開きます。" />
-        <bt:String id="Rules.Tooltip" DefaultValue="どのルールで点検するかを、カテゴリごとのタブで選びます。" />
+        <bt:String id="Panel.Tooltip" DefaultValue="点検はやり直さずに、前回の指摘一覧をそのまま出します。パネルを閉じたときや、ほかの一覧を見ていたときに戻る道です。" />
+        <bt:String id="Review.Tooltip" DefaultValue="文章添削チェックリストに沿って文書を点検し、指摘をパネルに一覧します。点検せずに前回の結果へ戻ることもできます。" />
+        <bt:String id="RunReview.Tooltip" DefaultValue="いまの文書を点検し直し、指摘をパネルに一覧します。1 ページあたり数秒かかります。" />
         <bt:String id="ApplyFindings.Tooltip" DefaultValue="直前の点検結果を、マーカーまたは Word のコメントとして文書に反映します。" />
         <bt:String id="Cleanup.Tooltip" DefaultValue="アドインが反映したマーカーまたはコメントを消去します。全削除の操作もここにまとめます。" />
         <bt:String id="Help.Tooltip" DefaultValue="操作の手順と、消すボタンの違いをパネルに表示します。" />
-        <bt:String id="Settings.Tooltip" DefaultValue="マーカーの色、長すぎる文の字数、欧文フォントなどを設定します。" />
+        <bt:String id="Settings.Tooltip" DefaultValue="点検するルール、マーカーの色、長すぎる文の字数、欧文フォントを設定します。" />
         <bt:String id="HighlightFindings.Tooltip" DefaultValue="直前の点検結果を、チェックリストのカテゴリ色で塗ります。" />
         <bt:String id="CommentFindings.Tooltip" DefaultValue="直前の点検結果を Word のコメントとして挿入します。返信や解決は Word の校閲機能でそのまま行えます。" />
         <bt:String id="ClearHighlights.Tooltip" DefaultValue="このアドインが塗ったハイライトだけを消します。手で塗ったマーカーは残ります。" />

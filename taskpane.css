@@ -35,8 +35,8 @@ code {
 
 /*
  * `hidden` を CSS より強くする。ブラウザの既定は display: none だが、
- * 作者側の display 指定に負ける — 下の .row がまさにそれで、
- * hidden を付けた #view-nav（← 指摘一覧に戻る）が指摘一覧でも出ていた。
+ * 作者側の display 指定に負ける — 下の .row のような display 持ちに
+ * hidden を付けても、消えずに出たままになる（実際に起きた）。
  * 表示・非表示は全部この属性で切り替えているので、ここが崩れると
  * どの画面にも出てはいけないものが出る。
  */
@@ -165,6 +165,22 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
 }
 
+/*
+ * 開いた選択肢の一覧だけ明朝になるのを止める.
+ *
+ * `<select>` を開いたときに出る一覧は、ページではなく macOS が描く。閉じている
+ * 枠は本文と同じゴシックなのに、開いた一覧の「1 枚ずつ開く」だけが明朝で出る、
+ * という食い違いが起きていた。枠の側には各所で `font: inherit` が効いていて、
+ * `option` には何も指定が無い —— そこで `-apple-system`（＝システム UI 書体）が
+ * 和文の代役を自分で選び、明朝を返している。
+ *
+ * 直すのは `option` だけでよい。枠の側は今のままで正しく出ているので触らず、
+ * 一覧の側にだけ和文ゴシックを名指しして、代役選びをさせない。
+ */
+option {
+  font-family: "Hiragino Sans", "Yu Gothic", "Segoe UI", -apple-system, sans-serif;
+}
+
 .taskpane {
   min-height: 100vh;
   background: #fff;
@@ -178,15 +194,9 @@ body {
 
 .panel-head h1 {
   margin: 0;
+  /* 本文の 1.5 は 1 行しかない見出しには広すぎ、字の下に 4px ほど余りが出る。 */
+  line-height: 1.3;
   font-size: 18px;
-}
-
-.panel-reference-jump {
-  min-height: 30px;
-  margin: 8px 0 0;
-  padding: 5px 8px;
-  font-size: 12px;
-  font-weight: 700;
 }
 
 .panel-head .status {
@@ -199,22 +209,52 @@ body {
   font-size: 12px;
 }
 
+/* 文字を空にしても要素は残るので、上の margin だけがタイトルの下に浮く。
+   ［文字］は開いた時点で状態表示を空にするため、ここが効かないと
+   何も書いていない行のぶんだけ見出しと一覧が離れる。 */
+.panel-head .status:empty {
+  display: none;
+}
+
 .panel-head .status.working {
   background: transparent;
   color: var(--ui-blue);
   animation: none;
 }
 
-/* フォントなどの専用画面は、点検結果の区切り線を持たない。 */
-.panel-head.context-view {
-  border-bottom-color: transparent;
+/* タイトルと、その画面のための操作を同じ行に並べる。状態表示は幅いっぱいを
+   取って次の行へ落ちる（flex-basis: 100%）。
+
+   position: relative は、この行のボタンから開く小窓（更新の知らせ・文献一覧の
+   設定）の置き場所。小窓はボタンではなくこの行を基準にする —— くわしくは
+   .update-popover のところに書いた。 */
+.panel-head {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 8px;
 }
 
-#update-banner,
-#view-nav,
+.panel-head h1 {
+  margin-right: auto;
+}
+
+.panel-head .status {
+  flex-basis: 100%;
+}
+
+/* フォントなどの専用画面は、点検結果の区切り線を持たない。
+   下の padding はその線と対で置いたものなので、線を消すなら一緒に詰める。 */
+.panel-head.context-view {
+  border-bottom-color: transparent;
+  padding-bottom: 4px;
+}
+
 #view-review > section,
 #view-compounds,
 #view-references,
+#view-figures,
 #view-fonts,
 #view-help {
   margin-left: 16px;
@@ -225,7 +265,14 @@ body {
   margin-top: 14px;
 }
 
-#view-nav { margin-top: 12px; }
+/* セクション同士の間隔（16〜18px）は、見出しのすぐ下では広すぎる。
+   タイトルと最初の項目が離れて、上が空白だけの画面に見える。 */
+#view-fonts > .font-section:first-child,
+#view-compounds > .compound-section:first-child,
+#view-references > .compound-section:first-child,
+#view-figures > .compound-section:first-child {
+  margin-top: 8px;
+}
 
 #start-section {
   padding: 14px;
@@ -349,7 +396,7 @@ button.result-card[aria-pressed="true"] {
 #findings .finding.severity-note { border-left-color: var(--ui-cyan); }
 
 #findings .finding-head { margin-bottom: 5px; }
-#findings .badge { color: #155b9e; font-size: 14px; }
+#findings .badge { color: var(--ui-ink); font-size: 14px; }
 #findings .severity {
   padding: 2px 7px;
   border-radius: 999px;
@@ -423,15 +470,87 @@ details.one-by-one .finding {
 
 /* --- 更新の案内 --- */
 
-/* Amber rather than the usual blue: this is the one message in the pane that
-   asks the user to go and do something outside Word. */
-.update {
-  margin-bottom: 12px;
-  padding: 10px 12px;
-  border: 1px solid rgba(193, 156, 0, 0.55);
-  border-left-width: 4px;
-  border-radius: 6px;
-  background: rgba(193, 156, 0, 0.09);
+/*
+ * タイトル行のアイコンと、押すと開く小窓。
+ *
+ * ここは以前、指摘一覧の上に居座る帯だった。開くたび画面の一番上を占め、
+ * 数えたばかりの件数より先に目に入る。伝えたいのは「マニフェストを入れ直す
+ * 用があります」の一言で、それは急ぎではないし、パネルを開いた用でもない。
+ *
+ * アイコンだけを増やし、中身は押したときに出す。出ていること自体が知らせで、
+ * ［あとで］はこの小窓を閉じるだけ — アイコンは残るので、あとから読める。
+ */
+/* タイトル行に置く、押すと下に小窓が出るボタン（更新の知らせ・文献一覧の設定）。
+   位置を持たせないのは、小窓の基準をボタンではなくタイトル行にするため。 */
+.update-wrap,
+.head-popover-wrap {
+  flex: 0 0 auto;
+  display: inline-flex;
+}
+
+/*
+ * ボタンそのものは隣の 3 つと同じ姿にして、**知らせは右上の点だけ**が持つ。
+ *
+ * 枠も地も琥珀に塗っていた頃は、この行でいちばん強い色がここだった。用件は
+ * 「都合のよいときに入れ直してください」でしかないのに、数え直しや文献リストへ
+ * 移動するボタンより目立っていて、並びから浮いていた。
+ *
+ * 点は 7px。これだけで「新しい何かがある」は伝わるし、無くなれば消える。
+ * 赤にしないのは、赤が誤りの色だから —— 版が古いのは誤りではない。
+ */
+.update-button {
+  position: relative;
+}
+
+.update-button::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ui-amber);
+  /* 枠やアイコンに重なっても点として読めるよう、白で縁取る。 */
+  box-shadow: 0 0 0 1.5px #fff;
+}
+
+.update-button[aria-expanded="true"] {
+  background: var(--ui-blue-soft);
+}
+
+/*
+ * 小窓の基準は、押したボタンではなくタイトル行そのもの。
+ *
+ * ボタンを基準に right: 0 で開いていた頃は、小窓が**パネルの左へはみ出して
+ * 切れていた**。ベルはアイコン 4 つのいちばん左にあるので、その右端から左へ
+ * 292px 伸ばせば、右側の 3 つぶん（約 80px）だけ左へ飛び出す。幅を 100vw から
+ * 引いて抑えても、引く量はボタンが何個右にあるかで変わるので合わせようがない
+ * ——［文献リストへ移動］は文献が無ければ消えるので、その数すら一定ではない。
+ *
+ * タイトル行を基準にすれば、左右 8px は行の端からの 8px になる。ボタンが何個
+ * あっても、パネルが何 px でも、はみ出しようがない。縦は行の下 6px、つまり
+ * 状態表示の下へ出る —— 以前は状態表示に重なっていたので、これは戻る話ではない。
+ *
+ * 姿は文献一覧の小窓（.reference-popover）と同じ、白地に細い枠。左端に太い琥珀の
+ * 帯を立てていたのをやめた。あの帯は、**同じ並びに他の札があるとき**にその 1 枚の
+ * 種類を言うための印で、ここには他の札が無い。押して開く小窓は、押したこと自体が
+ * 何の窓かを言っているので、帯は色が付いているだけになる。知らせであることは
+ * ベルの右上の点が持っている（.update-button::after）。
+ */
+.update-popover {
+  position: absolute;
+  z-index: 14;
+  top: calc(100% + 6px);
+  right: 8px;
+  box-sizing: border-box;
+  width: min(292px, calc(100% - 16px));
+  padding: 11px 12px;
+  border: 1px solid var(--ui-line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(20, 34, 54, 0.16);
+  text-align: left;
 }
 
 .update-title {
@@ -444,6 +563,12 @@ details.one-by-one .finding {
   margin: 0 0 8px;
   font-size: 12px;
   overflow-wrap: anywhere;
+}
+
+.update-hint {
+  margin: 8px 0 0;
+  color: var(--ui-muted);
+  font-size: 11px;
 }
 
 .update-url {
@@ -580,10 +705,13 @@ summary {
   margin-bottom: 4px;
 }
 
+/* 押せないものは青くしない。指摘カードの見出しに出るルール名は、カードの中で
+   いちばん目立つ文字なのに、押しても何も起きない。青は行き先のある文字
+   （ボタン・リンク・場所ボタン）だけに残す。 */
 .badge {
   font-size: 11px;
   font-weight: 600;
-  color: #0078d4;
+  color: var(--ui-ink);
 }
 
 .severity {
@@ -673,24 +801,6 @@ details.one-by-one .finding {
   border-radius: 5px;
 }
 
-button.inventory-label {
-  flex: 0 0 auto;
-  padding: 2px 6px;
-  border: none;
-  background: transparent;
-  font-size: 12px;
-  font-weight: 600;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-}
-
-/* The label inside a card heading is a button but should read as the heading it
-   replaces, so it keeps the badge's color and loses the button's padding. */
-button.inventory-label.badge {
-  padding: 0;
-  color: #0078d4;
-  text-decoration: none;
-}
-
 /* 化合物は一覧では番号と件数だけを読み、開いたときに場所を出す。 */
 .compound-item {
   flex: 0 0 auto;
@@ -747,6 +857,28 @@ button.inventory-label.badge {
 .compound-section[open] > summary::before {
   margin-bottom: 5px;
   transform: rotate(45deg);
+}
+
+/*
+ * 畳んだままでも結果が読めるように、見出しの右端に件数を出す。
+ *
+ * 節はすべて畳んだ状態で開くので、これが無いと走査のあとに見えるのは
+ * 見出しの行だけになる。空でも margin-left: auto は効くので、件数を持たない
+ * 見出しでも並びは変わらない。
+ */
+.section-count {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--ui-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* 件数が先に右へ寄るので、後ろのものは自分で寄らずその隣に並ぶ。 */
+.section-count + .section-help,
+.section-count + .reference-search-wrap,
+.reference-search-wrap + .section-help {
+  margin-left: 8px;
 }
 
 .section-help {
@@ -921,7 +1053,8 @@ button.inventory-label.badge {
 }
 
 .compound-section {
-  margin: 18px 0 0;
+  /* .font-section と同じ理由でそろえてある。 */
+  margin: 10px 0 0;
   border-top: 0;
   padding-top: 0;
 }
@@ -930,7 +1063,11 @@ button.inventory-label.badge {
   margin-left: 16px;
 }
 
-.compound-section > summary + .lead { margin-top: 10px; }
+.compound-section > summary + .lead { margin-top: 6px; }
+
+/* ［すべて 5］［問題あり 3］の札は見出しの真下に貼り付いていた。畳み開きの
+   見出しと、その中身の始まりは別のものなので、間を空ける。 */
+.compound-section > summary + .figure-tools { margin-top: 10px; }
 
 .compound-section > summary + .number-controls { margin-top: 12px; }
 
@@ -952,23 +1089,47 @@ button.inventory-label.badge {
 
 .reference-heading .section-help { margin-left: auto; }
 
-.reference-controls {
+/* 虫眼鏡と、その下に開く小窓。押したときだけ出る。 */
+.reference-search-wrap {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+}
+
+.reference-popover {
+  position: absolute;
+  z-index: 12;
+  top: calc(100% + 6px);
+  right: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 7px;
   align-items: end;
-  margin: 12px 0 6px;
+  box-sizing: border-box;
+  width: min(268px, calc(100vw - 52px));
   padding: 9px;
+  border: 1px solid var(--ui-line);
   border-radius: 8px;
-  background: #f6f8fb;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(20, 34, 54, 0.16);
   font-size: 11px;
   font-weight: 700;
 }
 
-.reference-controls label { display: grid; gap: 3px; color: var(--ui-muted); }
+.reference-popover[hidden] { display: none; }
 
-.reference-controls input:not([type="checkbox"]),
-.reference-controls select {
+/* 文献一覧の設定はタイトル行から開く。虫眼鏡の小窓と姿は同じだが、置き場所は
+   更新の知らせと同じ理由でタイトル行を基準にする（.update-popover 参照）。
+   歯車の右には本と数え直しがあるので、歯車を基準にすると左へはみ出す。 */
+#reference-settings-popover {
+  right: 8px;
+  width: min(268px, calc(100% - 16px));
+}
+
+.reference-popover label { display: grid; gap: 3px; color: var(--ui-muted); }
+
+.reference-popover input:not([type="checkbox"]),
+.reference-popover select {
   min-width: 0;
   height: 29px;
   box-sizing: border-box;
@@ -983,6 +1144,44 @@ button.inventory-label.badge {
 
 .reference-search { grid-column: 1 / -1; }
 
+/* 2 列の半分では読み切れない行。「1 枚ずつ開く（他を押すと閉じる）」は、
+   畳んだ枠に出るのが選んだ側の文なので、切れると何を選んだのか分からない。 */
+.reference-popover label.wide { grid-column: 1 / -1; }
+
+/* ［図・表］の設定は今のところ 1 つきり。2 列に割ると、右半分が空いたまま
+   左半分だけが狭くなる。 */
+#figure-settings-popover { grid-template-columns: 1fr; }
+
+/* 欄が 4 つあることの意味を、欄より先に言う。 */
+.reference-search-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.55;
+}
+
+.reference-search-hint strong { color: var(--ui-ink); }
+
+.reference-search-count {
+  grid-column: 1;
+  align-self: center;
+  margin: 0;
+  color: var(--ui-blue);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.reference-search-count:empty { display: none; }
+
+.reference-search-clear {
+  grid-column: 2;
+  justify-self: end;
+  padding: 3px 10px;
+  font-size: 11px;
+}
+
 .crossref-enable {
   grid-column: 1 / -1;
   display: flex !important;
@@ -992,6 +1191,22 @@ button.inventory-label.badge {
 }
 
 .crossref-enable input { margin: 0; }
+
+/* チェックの意味。押す前に読めるところに置く。 */
+.crossref-about {
+  grid-column: 1 / -1;
+  margin: -2px 0 0;
+  color: var(--ui-muted);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.55;
+}
+
+.crossref-about strong { color: var(--ui-ink); }
+
+/* 2 文目は段落として離す。1 文目だけがチェックの続きなので、上へ詰めるのも
+   1 文目だけ。 */
+.crossref-about + .crossref-about { margin-top: 0; }
 
 .crossref-status {
   grid-column: 1 / -1;
@@ -1016,7 +1231,94 @@ button.inventory-label.badge {
 .reference-item { cursor: pointer; }
 .reference-item button,
 .reference-item a { cursor: pointer; }
-.reference-item .inventory-label.badge { color: var(--ui-ink); }
+
+/*
+ * 文献 1 件は 1 行から始まる。
+ *
+ * 99 件の原稿で 1 枚が 249px あった。内訳は見出し行 19・書誌 18・Crossref の箱
+ * 82・引用場所 96 で、**書誌そのものは 18px**。残りは付随情報で、1 件を読むには
+ * 要るが、目的の文献を探しているあいだは 1 つも要らない。
+ *
+ * そこで番号と回数を書誌と同じ行に畳み（見出し行を廃止）、Crossref と引用場所は
+ * 開いた 1 枚だけが持つ。畳んだ 1 件は 32px。
+ *
+ * この行（.reference-line / .reference-entry / .reference-number）は図・表の
+ * カードも使う。同じ形のものなので、`.reference-item` の下に閉じ込めない ——
+ * 閉じ込めていたあいだ、図表のカードだけが回数の札を次の行に落としていた。
+ */
+.reference-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+/* 黒。青い `[1]` はリンクに見え、押せば文献リストへ飛ぶのだと読めてしまう
+   （実際に押す先はカード全体で、行き先はその下の場所ボタン）。 */
+.reference-number {
+  color: var(--ui-ink);
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+/* Crossref の箱と場所ボタンが地続きに見えないよう、間を空ける。
+   カードの下の余白（padding 8px）と同じだけ。 */
+.reference-item .figure-places {
+  margin-top: 8px;
+}
+
+.reference-line .reference-entry {
+  flex: 1 1 auto;
+  /* flex の子は中身より小さくなれない。これが無いと省略記号が出ず、
+     長い書誌が回数の札を押し出す。 */
+  min-width: 0;
+  margin: 0;
+}
+
+.reference-line .severity { flex: 0 0 auto; }
+
+.reference-item.collapsed { padding: 6px 8px; }
+
+.reference-item.collapsed .reference-entry {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 歯車の［書誌：折り返す］。切れるのが嫌な人のための逃げ道で、既定は 1 行。 */
+#references.wrap-entries .reference-item.collapsed .reference-entry {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+/*
+ * Crossref の候補と食い違ったところ。
+ *
+ * 印は畳んだ行に出す（開かないと分からない印では、99 件から見つける役に立た
+ * ない）。琥珀色なのは「確認してください」の意味で、赤（＝原稿に無い・引用が
+ * 無い）とは別 —— **食い違っているのは原稿とは限らず、候補が別の論文のことも
+ * ある**。どちらかは人が決める。
+ */
+.reference-mismatch-mark {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border: 1px solid #f0c479;
+  border-radius: 9px;
+  background: #fff6e5;
+  color: var(--ui-amber);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.crossref-mismatch {
+  margin-top: 2px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(193, 156, 0, 0.35);
+  color: #6b4300;
+  font-weight: 600;
+}
 
 .reference-source {
   margin: 0 0 3px;
@@ -1041,7 +1343,8 @@ button.inventory-label.badge {
 
 .reference-highlight-scope input { margin: 0; }
 
-#view-references > .compound-section:last-child { margin-bottom: 22px; }
+/* 最後の節の下 margin はここにあったが、親の外へ抜けて効いていなかった。
+   画面の下余白は #view-references の padding-bottom が持つ。 */
 
 .crossref-details {
   display: grid;
@@ -1064,14 +1367,38 @@ button.inventory-label.badge {
 .crossref-title { color: var(--ui-ink); }
 .crossref-details a { color: #0078d4; overflow-wrap: anywhere; }
 
-/* Each 「7ページ 31段落」 is its own destination. Styled as a link rather than a
-   button so a row of eight of them still reads as a line of text. */
+/* Each 「p.7 ¶31」 is its own destination. Styled as a link rather than a
+   button so a row of eight of them still reads as a line of text. One line per
+   page, with the page number in the margin: the button then carries only the
+   paragraph, and how the mentions cluster is readable down the left edge. */
 .places {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 0;
+}
+
+.places-line {
   display: flex;
   flex-wrap: wrap;
+  align-items: baseline;
   gap: 5px;
-  margin: 6px 0 0;
   line-height: 1.9;
+}
+
+/* Wide enough for 「p.999」 so the paragraphs start on one column even when the
+   page numbers reach three digits. */
+.place-page {
+  flex: 0 0 auto;
+  min-width: 36px;
+  color: var(--ui-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.places-legend {
+  margin-left: 6px;
+  color: var(--ui-muted);
+  font-weight: 400;
 }
 
 button.place {
@@ -1086,10 +1413,126 @@ button.place {
   white-space: nowrap;
 }
 
+/* --- 図・表一覧 ---------------------------------------------------------
+   番号・キャプション・移動先を、文献一覧と同じ 1 件 1 枚のカードで読ませる。
+
+   引っかかりの数え上げを載せる琥珀の帯（.figure-alert）がここにあったが、
+   やめた。「本文で参照なし 5 件。」の 1 文が、それが指している一覧そのものより
+   目立っていて、順番が逆だった。いまはタイトル下の 1 行に、数えた結果に続けて
+   書いている（taskpane.ts の figureNotes）。 */
+
+.figure-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.figure-chip {
+  flex: 0 0 auto;
+  padding: 2px 9px;
+  border: 1px solid var(--ui-line);
+  border-radius: 999px;
+  background: #fff;
+  color: #43536a;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.figure-chip[aria-pressed="true"] {
+  border-color: var(--ui-blue);
+  background: var(--ui-blue-soft);
+  color: var(--ui-blue);
+}
+
+/*
+ * 図表 1 件のカード。文献カードと同じ姿にしてある。
+ *
+ * 枠・左の色・畳んだときの 1 行は .finding と .reference-item のものをそのまま
+ * 使い、ここは図表にしかない差だけを足す。素の行に並べていた頃は、番号と居場所
+ * しか出ず、**その番号が何の図なのかが一言も無かった** —— Figure 3 と Figure 6 の
+ * どちらを見に行くかは、どちらも開いてみないと決められなかった。
+ */
+.figure-item { cursor: pointer; }
+.figure-item button { cursor: pointer; }
+.figure-item.selected { border-left-color: var(--ui-blue) !important; }
+.figure-item.collapsed { padding: 6px 8px; }
+
+/* 畳んだ 1 枚は 1 行。長いキャプションは切って、全文は開くかホバーで読ませる。 */
+.figure-item.collapsed .reference-entry {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 開いた 1 枚の中の印と場所。カードの下の余白と同じだけ空ける。 */
+.figure-item .figure-flags,
+.figure-item .figure-places { margin-top: 8px; }
+
+/* 畳んだ 1 枚の印。次の行に落とすが、間は詰める —— 1 行のつもりの高さに
+   もう 1 行ぶん空くと、畳んでいる意味が薄れる。 */
+.figure-item.collapsed .figure-flags { margin-top: 4px; }
+
+/* 抜けている番号は押しても開かない。押せそうに見せない。 */
+.figure-item-missing { cursor: default; }
+.figure-item-missing .reference-number { color: var(--ui-muted); }
+
+.figure-caption-missing { color: var(--ui-muted); }
+
+.figure-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/*
+ * 印は 2 段。琥珀が「直すもの」、灰が「確かめるだけのもの」。
+ *
+ * 3 種類とも琥珀だった頃は、どれも同じ重さに見えていた。「キャプションなし」は
+ * キャプションが画像の中にあるだけでも必ず出るので、原稿が正しくても並ぶ ——
+ * それが本文で参照し忘れている図と同じ色では、後者が埋もれる。
+ * どちらを琥珀にするかは taskpane.ts の FIGURE_ISSUES_TO_FIX が決める。
+ */
+.figure-flag {
+  padding: 0 5px;
+  border: 1px solid var(--ui-line);
+  border-radius: 3px;
+  background: #f4f6f9;
+  color: var(--ui-muted);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.figure-flag.warn {
+  border-color: #f0c479;
+  background: #fff6e5;
+  color: var(--ui-amber);
+}
+
+.figure-places {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.figure-places-label {
+  color: var(--ui-muted);
+  font-size: 11px;
+}
+
+/* キャプションと本文参照は同じ行に並ぶので、色で見分けられるようにする。 */
+button.place.caption {
+  border-color: rgba(24, 134, 92, 0.4);
+  color: var(--ui-green);
+}
+
 @media (max-width: 350px) {
-  .reference-controls { grid-template-columns: 1fr; }
-  .reference-controls label,
-  .reference-controls button { grid-column: auto; }
+  .reference-popover { grid-template-columns: 1fr; }
+  .reference-popover label,
+  .reference-popover button { grid-column: auto; }
 }
 
 .inventory-count {
@@ -1100,13 +1543,81 @@ button.place {
 
 /* --- フォント --- */
 
-.font-section {
-  margin: 16px 0 0;
+/* タイトル行の右端。更新の知らせは全画面に、数え直しは一覧の画面だけに出る。 */
+.head-actions,
+.view-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 絵だけのボタン。文字ぶんの幅を持たせない。 */
+.icon-button {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 6px;
+}
+
+.icon-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* 見出しの中に置く分。枠と地色を持たせると、見出しより先に目に入る。 */
+.icon-button.subtle {
+  width: 20px;
+  height: 20px;
+  border: 0;
+  background: none;
+  color: #50647d;
+}
+
+.icon-button.subtle[aria-expanded="true"] {
+  background: var(--ui-blue-soft);
+  color: var(--ui-blue);
+}
+
+/* 絞り込みが効いている虫眼鏡。小窓を閉じると条件は見えなくなるので、
+   一覧が全部ではないことをボタン自身が言う。 */
+.icon-button.subtle.active {
+  background: var(--ui-blue-soft);
+  color: var(--ui-blue);
+}
+
+.scanned-at {
+  color: var(--ui-muted);
+  font-size: 12px;
+}
+
+/* 一覧以外の画面では中身が空になる。要素が残ると、その分の gap だけ
+   更新の知らせのアイコンが行の内側へずれる。 */
+.scanned-at:empty {
+  display: none;
+}
+
+/*
+ * 畳める節の見た目は 1 つだけ。
+ *
+ * 図表の種類（Figure・Table・Scheme…）も同じ作りなので、同じ規則に相乗りさせて
+ * ある。以前はこちらだけ 12px・灰青・見出しの下に罫線という別の姿を持っていて、
+ * 同じパネルの中で畳める節が 2 種類あるように見えていた。
+ */
+.font-section,
+.figure-group {
+  /* 畳んだ項目は 1 行しかないので、節と節の間隔をそのまま使うと一覧が間延びする。
+     開いたときの見出しと中身の間（下の 6px）と、この 10px の差が階層を示す。 */
+  margin: 10px 0 0;
   border-top: 0;
   padding: 0;
 }
 
-.font-section > summary {
+.font-section > summary,
+.figure-group > summary {
   display: flex;
   align-items: center;
   cursor: pointer;
@@ -1116,9 +1627,11 @@ button.place {
   list-style: none;
 }
 
-.font-section > summary::-webkit-details-marker { display: none; }
+.font-section > summary::-webkit-details-marker,
+.figure-group > summary::-webkit-details-marker { display: none; }
 
-.font-section > summary::before {
+.font-section > summary::before,
+.figure-group > summary::before {
   width: 6px;
   height: 6px;
   margin: 0 8px 2px 2px;
@@ -1128,24 +1641,44 @@ button.place {
   transform: rotate(-45deg);
 }
 
-.font-section[open] > summary::before {
+.font-section[open] > summary::before,
+.figure-group[open] > summary::before {
   margin-bottom: 5px;
   transform: rotate(45deg);
 }
 
-.font-section > :not(summary) {
+.font-section > :not(summary),
+.figure-group > :not(summary) {
   margin-left: 16px;
 }
 
-.font-section > summary + .lead { margin-top: 10px; }
+.font-section > summary + .lead { margin-top: 6px; }
 
-#view-fonts { padding-bottom: 32px; }
+/*
+ * 一覧の下に置く余白。**padding であることが要点**.
+ *
+ * 最後の節に `margin-bottom` を付けていた画面（［文献］）では、この余白が
+ * 効いていなかった —— 親に padding も枠も無いと、子の下 margin は親の外へ
+ * 抜ける（margin collapsing）。指定はあるのに、一括変更のボタンが画面の
+ * 最下端に貼り付いたままだった。
+ *
+ * 5 つの画面をまとめて書くのは、次に画面が増えたときに 1 つだけ抜けるのを
+ * 防ぐため。抜けても気づけるのは、その画面を最後までスクロールした人だけ。
+ */
+#view-review,
+#view-compounds,
+#view-references,
+#view-figures,
+#view-fonts,
+#view-help {
+  padding-bottom: 32px;
+}
 
-#view-compounds { padding-bottom: 32px; }
-
+/* 文が丸ごと青いのはパネル中ここだけだった。太字が要点を持っているので、
+   色まで足す必要はない。 */
 .font-summary {
   margin: 9px 0 8px;
-  color: var(--ui-blue);
+  color: var(--ui-ink);
   font-size: 12px;
   font-weight: 700;
 }
@@ -1172,6 +1705,13 @@ button.place {
   color: var(--ui-ink);
 }
 
+/* 色名だけでは何色か伝わらないので、見本を横に並べる。 */
+.color-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
 .font-stat {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1184,9 +1724,10 @@ button.place {
   font-size: 12px;
 }
 
+/* 「和文フォント」「欧文フォント」は行き先ではなく分類。灰色で足りる。 */
 .font-kind {
   align-self: start;
-  color: #155b9e;
+  color: var(--ui-muted);
   font-size: 10px;
   font-weight: 700;
 }
@@ -1521,14 +2062,6 @@ button.place {
   border-radius: 5px;
 }
 
-#view-nav {
-  margin-bottom: 10px;
-}
-
-#view-nav button {
-  flex: 0 0 auto;
-}
-
 /* --- 設定の別窓（rules.html / settings.html。Office ダイアログ） --- */
 
 /* The window fills its frame: head, tabs and foot pinned, only the body scrolls. */
@@ -1572,6 +2105,22 @@ button.place {
   border-bottom: 1px solid rgba(127, 127, 127, 0.3);
 }
 
+/* 「190 件中 178 件が有効」 beside the ルール panel's buttons. It used to sit in the
+   window's footer, which now belongs to every tab and cannot say this. */
+.rule-count {
+  margin-left: auto;
+  color: #666;
+  font-size: 11px;
+}
+
+/* The カテゴリ tabs inside the ルール panel. They sit in the scrolling body, not
+   at the window edge, so they drop the outer bar's side padding and keep a gap
+   from the rules below. */
+.tabs.subtabs {
+  padding: 8px 0 0;
+  margin-bottom: 10px;
+}
+
 button.tab {
   flex: 0 0 auto;
   padding: 6px 10px;
@@ -1606,10 +2155,13 @@ button.tab.selected {
   flex: 0 0 auto;
 }
 
+/* 下だけ厚いのは、ここが**中で転がる箱**だから。上下 10px のままだと、
+   最後まで転がしたとき最後の行が下の帯にほとんど触れる。［更新履歴］と
+   ルールの各分類は 1800px を超えるので、必ずその状態になる。 */
 .dialog-body {
   flex: 1 1 auto;
   overflow-y: auto;
-  padding: 10px 12px;
+  padding: 10px 12px 24px;
 }
 
 .dialog-body h3 {
@@ -1627,6 +2179,75 @@ label.check {
   display: block;
   margin: 6px 0;
   font-size: 12px;
+}
+
+/* --- 更新履歴（settings.html） --- */
+
+/* いま入っているのはどこまでか。1 行目に置く。 */
+.changelog-state {
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+
+/* 入れ直す用があるときだけ色が付く。ふだんは本文と同じ扱い。 */
+.changelog-state.behind {
+  padding: 7px 9px;
+  border: 1px solid rgba(193, 156, 0, 0.55);
+  border-left-width: 4px;
+  border-radius: 6px;
+  background: rgba(193, 156, 0, 0.1);
+}
+
+/* 1 つしかない行なので、放っておくと幅いっぱいに伸びる。用件の重さに合わない。 */
+#changelog-download {
+  flex: 0 0 auto;
+}
+
+.release {
+  margin: 12px 0;
+  padding-top: 11px;
+  border-top: 1px solid rgba(127, 127, 127, 0.25);
+}
+
+.release:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.release-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0 0 5px;
+  font-size: 12px;
+}
+
+.release-version {
+  color: #666;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+}
+
+/* 入れ直しが要った回。要らない回との差が、この一覧のいちばんの読みどころ。 */
+.release-badge {
+  padding: 1px 6px;
+  border-radius: 9px;
+  background: rgba(193, 156, 0, 0.16);
+  color: #8a6d00;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.release-changes {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.release-changes li {
+  margin: 2px 0;
 }
 
 /* --- マーカーの色（settings.html） --- */
@@ -1724,11 +2345,6 @@ details.entries summary {
 
 /* --- 使い方 --- */
 
-#view-help h3 {
-  font-size: 13px;
-  margin: 16px 0 4px;
-}
-
 /* 手順と箇条書き。パネルは幅が狭いので、字下げは最小限にして
    行そのものを読ませる。 */
 ol.help,
@@ -1744,22 +2360,50 @@ ul.help li {
   margin: 3px 0;
 }
 
-table.help {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 6px 0 8px;
+/* 画面の枠組みを言う 2 文。地色を敷いて、下に続くボタンの一覧と読み分ける。 */
+.help-intro {
+  margin: 0 0 12px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #f6f8fb;
+  color: var(--ui-ink);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+/* リボンのボタン早見。名前と説明の 2 列で、名前の列は折り返さない。
+   罫線のある表にすると、パネルの幅ではセルが縦に伸びて読みにくかった。 */
+.ribbon-help {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 10px;
+  margin: 0 0 4px;
   font-size: 12px;
+  line-height: 1.55;
 }
 
-table.help th,
-table.help td {
-  border: 1px solid rgba(127, 127, 127, 0.35);
-  padding: 4px 6px;
-  text-align: left;
-  vertical-align: top;
+.ribbon-help dt {
+  font-weight: 700;
+  white-space: nowrap;
 }
 
-table.help th {
-  background: rgba(127, 127, 127, 0.1);
-  font-weight: 600;
+.ribbon-help dd {
+  margin: 0;
+  color: var(--ui-muted);
+}
+
+/* 「全て削除」だけは色でも言う。太字は隣のボタン名も太字なので、
+   この 1 語が並びの中で沈む。 */
+.help strong.danger,
+.ribbon-help strong.danger {
+  color: #d13438;
+}
+
+/* 版の表示は最後。上の線が本文との区切りを兼ねる。 */
+.help-version {
+  margin: 14px 0 0;
+  padding: 9px 0 4px;
+  border-top: 1px solid var(--ui-line);
+  color: var(--ui-muted);
+  font-size: 12px;
 }

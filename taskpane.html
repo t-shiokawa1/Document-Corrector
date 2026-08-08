@@ -5,44 +5,165 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Document Corrector</title>
     <!-- Word caches files referenced by taskpane.html separately from the manifest. -->
-    <link rel="stylesheet" href="taskpane.css?v=1.16.0.24" />
+    <link rel="stylesheet" href="taskpane.css?v=1.17.0.1" />
     <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-    <script defer src="taskpane.js?v=1.16.0.24"></script>
+    <script defer src="taskpane.js?v=1.17.0.1"></script>
   </head>
   <body>
     <main class="taskpane">
-      <!-- List views put the return action before their title, so the next move
-           is available immediately without making the title compete with it. -->
-      <div id="view-nav" class="row compact" hidden>
-        <button id="back-to-review" type="button">← 指摘一覧に戻る</button>
-      </div>
-      <header id="panel-head" class="panel-head">
-        <h1 id="panel-title">点検結果</h1>
-        <button id="reference-list-jump" class="panel-reference-jump" type="button" hidden disabled>本文中の文献リストへ</button>
+      <!-- 見出しと status は、最初に出る画面（使い方）のもの。showView が
+           画面ごとに書き換える。 -->
+      <header id="panel-head" class="panel-head context-view">
+        <h1 id="panel-title">使い方</h1>
+        <!-- 数字は走査した瞬間のもので、本文を直しても勝手には変わらない。
+             リボンまで戻らずに数え直せる場所と、いつの数字かをタイトル行に置く。
+             化合物・文献・図表・文字の 4 画面で共有し、showView が出し入れする。 -->
+        <div class="head-actions">
+          <!-- いつ数えたか。行の中では文字はここだけなので、絵のボタンより先に
+               置いて、アイコンどうしが離ればなれにならないようにする。
+               一覧の画面以外では showView が空にし、:empty が行から外す。 -->
+          <span id="view-scanned-at" class="scanned-at"></span>
+          <!-- 更新の知らせ。出るのは、入っているマニフェストが配布中のものより
+               古いときだけ（src/core/version.ts）。以前はここに大きな帯を出して
+               いたが、点検の結果より先に目に入るのは順番が違う。アイコンだけ
+               増やし、中身は押したときの小窓に入れてある。 -->
+          <div id="update-wrap" class="update-wrap" hidden>
+            <button id="update-toggle" type="button" class="icon-button update-button"
+                    aria-expanded="false" aria-controls="update-popover"
+                    aria-label="新しいバージョンがあります" title="新しいバージョンがあります">
+              <!-- ベル＝お知らせ。以前は受け皿に下向き矢印（＝ダウンロード）で、
+                   文献の一覧の中にあるものだから**その文献を落とすボタン**に
+                   見えていた。矢印は向きを変えても「何を」の説明にならない。
+                   知らせであることだけを言うベルにする。 -->
+              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+                <path d="M8 2.1a3.6 3.6 0 0 0-3.6 3.6c0 3.4-1.2 4.4-1.2 4.4h9.6s-1.2-1-1.2-4.4A3.6 3.6 0 0 0 8 2.1Z"
+                      fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+                <path d="M6.7 12.3a1.4 1.4 0 0 0 2.6 0" fill="none" stroke="currentColor"
+                      stroke-width="1.5" stroke-linecap="round" />
+              </svg>
+            </button>
+            <section id="update-popover" class="update-popover" hidden aria-label="新しいバージョンがあります">
+              <p class="update-title">新しいバージョンがあります</p>
+              <p id="update-note" class="update-note"></p>
+              <div class="row compact">
+                <button id="update-open" type="button" class="primary">ダウンロードページを開く</button>
+                <button id="update-dismiss" type="button">あとで</button>
+              </div>
+              <p class="update-hint">くわしい変更点は［設定］＞［更新履歴］にあります。</p>
+              <p id="update-url" class="update-url" hidden></p>
+            </section>
+          </div>
+          <div id="view-refresh-row" class="view-actions" hidden>
+            <!-- ［文献］の見え方。一覧そのものではなく「どう見せるか」なので、
+                 絞り込み（虫眼鏡）とは分けて、画面の道具が並ぶこの行に置く。
+                 中身は保存されるので、開き直しても選んだままになる。 -->
+            <div id="reference-settings-wrap" class="head-popover-wrap" hidden>
+              <button id="reference-settings-toggle" type="button" class="icon-button"
+                      aria-expanded="false" aria-controls="reference-settings-popover"
+                      aria-label="文献一覧の表示設定" title="文献一覧の表示設定">
+                <!-- 歯車は塗りで描く。この行の他は線画だが、14px の線で描いた
+                     歯車は歯と軸が離れて**太陽の絵に見える**（実際そう見えた）。
+                     塗りなら輪郭が 1 つの形にまとまり、この大きさでも歯車と読める。 -->
+                <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+                  <path fill="currentColor" fill-rule="evenodd"
+                        d="M6.9 1.2h2.2l.3 1.7c.5.15 1 .35 1.4.63l1.45-.98 1.55 1.55-.98 1.45c.28.42.48.9.63 1.4l1.7.3v2.2l-1.7.3c-.15.5-.35.98-.63 1.4l.98 1.45-1.55 1.55-1.45-.98c-.42.28-.9.48-1.4.63l-.3 1.7H6.9l-.3-1.7c-.5-.15-.98-.35-1.4-.63l-1.45.98-1.55-1.55.98-1.45c-.28-.42-.48-.9-.63-1.4l-1.7-.3V6.9l1.7-.3c.15-.5.35-.98.63-1.4L2.2 3.75 3.75 2.2l1.45.98c.42-.28.9-.48 1.4-.63ZM8 5.6a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 0 0 0-4.8Z" />
+                </svg>
+              </button>
+              <div id="reference-settings-popover" class="reference-popover" role="dialog"
+                   aria-label="文献一覧の表示設定" hidden>
+                <label>著者<select id="reference-authors" aria-label="著者の表示方法">
+                  <option value="short">先頭著者のみ</option>
+                  <option value="all">全員</option>
+                </select></label>
+                <!-- 3 択の分かれ目は「他を押したときに閉じるか」。名前にそこを書く
+                     —— 「1 枚ずつ」と「選んだものを」だけでは違いが読み取れない。 -->
+                <label class="wide">カード<select id="reference-expand" aria-label="カードの開き方">
+                  <option value="one">1 枚ずつ開く（他を押すと閉じる）</option>
+                  <option value="many">選んだものを開く（閉じない）</option>
+                  <option value="all">すべて開く</option>
+                </select></label>
+                <!-- 「書誌」では何を選ばされているのか分からない。選ぶのは、幅に
+                     入りきらなかったときの扱い方。 -->
+                <label>はみ出す文字<select id="reference-wrap" aria-label="幅に入りきらない書誌の見せ方">
+                  <option value="clip">1 行で切る</option>
+                  <option value="wrap">折り返す</option>
+                </select></label>
+                <label class="crossref-enable"><input id="crossref-enabled" type="checkbox" /> Crossref による逆引き検索を有効にする</label>
+                <!-- 押す前に何をするものか分かるように、2 文だけ置く。
+                     かかる時間は走り出せば進行の行が言うので、ここでは言わない
+                     —— 小窓に 5 文あった頃は、長すぎて誰も読まなかった。 -->
+                <p class="crossref-about">
+                  文献リストの各項目を Crossref（学術文献のデータベース）で照合し、
+                  いちばん近い論文の<strong>題名と DOI</strong> をカードに出します。
+                </p>
+                <p class="crossref-about">
+                  誌名・年・巻・ページの取り違えや、存在しない文献に気づけます。
+                </p>
+              </div>
+            </div>
+            <!-- ［図・表］の見え方。文献の歯車と同じ場所・同じ絵で、中身だけが違う。
+                 一覧が違えば開けておきたい枚数も違うので、設定は分けて覚える。 -->
+            <div id="figure-settings-wrap" class="head-popover-wrap" hidden>
+              <button id="figure-settings-toggle" type="button" class="icon-button"
+                      aria-expanded="false" aria-controls="figure-settings-popover"
+                      aria-label="図・表一覧の表示設定" title="図・表一覧の表示設定">
+                <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+                  <path fill="currentColor" fill-rule="evenodd"
+                        d="M6.9 1.2h2.2l.3 1.7c.5.15 1 .35 1.4.63l1.45-.98 1.55 1.55-.98 1.45c.28.42.48.9.63 1.4l1.7.3v2.2l-1.7.3c-.15.5-.35.98-.63 1.4l.98 1.45-1.55 1.55-1.45-.98c-.42.28-.9.48-1.4.63l-.3 1.7H6.9l-.3-1.7c-.5-.15-.98-.35-1.4-.63l-1.45.98-1.55-1.55.98-1.45c-.28-.42-.48-.9-.63-1.4l-1.7-.3V6.9l1.7-.3c.15-.5.35-.98.63-1.4L2.2 3.75 3.75 2.2l1.45.98c.42-.28.9-.48 1.4-.63ZM8 5.6a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 0 0 0-4.8Z" />
+                </svg>
+              </button>
+              <div id="figure-settings-popover" class="reference-popover" role="dialog"
+                   aria-label="図・表一覧の表示設定" hidden>
+                <label class="wide">カード<select id="figure-expand" aria-label="カードの開き方">
+                  <option value="one">1 枚ずつ開く（他を押すと閉じる）</option>
+                  <option value="many">選んだものを開く（閉じない）</option>
+                  <option value="all">すべて開く</option>
+                </select></label>
+              </div>
+            </div>
+            <!-- ［文献］だけの行き先なので、文献が 1 件も無ければ出さない。
+                 絵だけのボタンなので、名前は aria-label が持つ（title はマウス用）。 -->
+            <button id="reference-list-jump" type="button" class="icon-button" hidden disabled
+                    aria-label="本文中の文献リストへ移動" title="本文中の文献リストへ移動">
+              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+                <path d="M8 4.3C6.9 3.2 5.1 2.8 2.7 3.1v8.8c2.4-.3 4.2.1 5.3 1.2 1.1-1.1 2.9-1.5 5.3-1.2V3.1c-2.4-.3-4.2.1-5.3 1.2Z"
+                      fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+                <path d="M8 4.5v8.6" fill="none" stroke="currentColor" stroke-width="1.3" />
+              </svg>
+            </button>
+            <!-- 絵だけのボタンなので、名前は aria-label が持つ（title はマウス用）。
+                 Unicode の ↻ はフォントによって出方が変わるので図形で描く。 -->
+            <button id="view-refresh" type="button" class="icon-button"
+                    aria-label="最新の状態に更新" title="最新の状態に更新">
+              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+                <path d="M8 3.2A4.8 4.8 0 1 0 12.8 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+                <path d="M8 1.2 10.2 3.2 8 5.2Z" fill="currentColor" />
+              </svg>
+            </button>
+          </div>
+        </div>
         <p id="status" class="status">読み込み中…</p>
       </header>
-      <!-- Shown only when the installed manifest is older than the published one.
-           Rule updates arrive on their own and say nothing; this appears when the
-           ribbon itself has changed and the manifest has to be re-installed. -->
-      <section id="update-banner" class="update" hidden>
-        <p class="update-title">新しいバージョンがあります</p>
-        <p id="update-note" class="update-note"></p>
-        <div class="row compact">
-          <button id="update-open" type="button" class="primary">ダウンロードページを開く</button>
-          <button id="update-dismiss" type="button">あとで</button>
-        </div>
-        <p id="update-url" class="update-url" hidden></p>
-      </section>
 
-      <div id="view-review">
-        <!-- 点検前だけ出る案内。ボタンが 15 個並んでいるところに放り出されると、
-             初見では最初の一手が決まらない（実機での指摘）。 -->
+      <!-- 最初に出るのは［使い方］（下の view-help）。ここが hidden で始まるのは
+           その分。JavaScript が読み込まれる前の一瞬に空の指摘一覧を見せない。 -->
+      <div id="view-review" hidden>
+        <!-- 点検前だけ出る案内。指摘の読み方はここが持つ — 使い方の画面はリボンの
+             説明に徹していて、パネル側のボタン（［文書内で表示］［修正］［無視］）の
+             話はこちらの担当。点検が済めば指摘そのものが答えになるので消える。 -->
         <section id="start-section">
           <h2>はじめに</h2>
           <p class="lead">
-            リボンの<strong>［文書をチェック］</strong>を押すと点検が始まり、指摘がここに並びます。
-            1 ページあたり数秒かかります。
+            リボンの<strong>［文書をチェック］＞［いま点検する］</strong>で点検が始まり、
+            指摘がここに並びます。<strong>1 ページあたり数秒</strong>、論文 1 本なら分単位です。
           </p>
+          <ul class="help">
+            <li>指摘は<strong>分類 → ルール</strong>の 2 段。同じルールの指摘は 1 つの見出しにまとまります</li>
+            <li>各指摘の<strong>［文書内で表示］</strong>でその箇所へ。直すなら<strong>［修正］</strong>、
+              要らない指摘は<strong>［無視］</strong></li>
+            <li>見出しの<strong>［まとめて修正］</strong>で、そのルールの分だけ一括で直せます</li>
+            <li><strong>［無視］した指摘は原稿ファイルに残ります。</strong>共著者の画面でも出ません</li>
+          </ul>
           <div class="row compact">
             <button id="open-help" type="button" class="primary">使い方をひらく</button>
           </div>
@@ -101,8 +222,8 @@
       </div>
 
       <div id="view-compounds" hidden>
-        <details class="compound-section" open>
-          <summary><span>化合物一覧</span><span class="section-help" role="img" tabindex="0" aria-label="化合物一覧の説明" data-tooltip="本文に出てくる番号と、その回数を一覧します。番号を開くと出てくる場所を確認でき、ページ・段落のボタンで該当箇所へ移動します。太字の番号、「化合物 5」のように語を伴うもの、系列ラベル（5a、1a–f）を数えます。Figure・Table などに続く番号は除きます。">?</span></summary>
+        <details class="compound-section">
+          <summary><span>化合物一覧</span><span id="count-compounds" class="section-count"></span><span class="section-help" role="img" tabindex="0" aria-label="化合物一覧の説明" data-tooltip="本文に出てくる番号と、その回数を一覧します。番号を開くと出てくる場所を確認でき、場所のボタン（p. がページ、¶ が段落）で該当箇所へ移動します。太字の番号、「化合物 5」のように語を伴うもの、系列ラベル（5a、1a–f）を数えます。Figure・Table などに続く番号は除きます。">?</span></summary>
           <div id="compounds"></div>
         </details>
         <details class="compound-section">
@@ -141,18 +262,52 @@
       </div>
 
       <div id="view-references" hidden>
-        <details class="compound-section" open>
-          <summary><span>引用文献一覧</span><span class="section-help" role="img" tabindex="0" aria-label="引用文献一覧の説明" data-tooltip="本文の引用と末尾の文献リストを照合します。カードの空いている部分を押して文献を選び、ページ・段落で本文の引用箇所へ移動します。文献リストへはボタンから移動できます。">?</span></summary>
-          <details class="compound-section reference-filter-section">
-            <summary><span>検索・絞り込み</span><span class="section-help" role="img" tabindex="0" aria-label="検索・絞り込みの説明" data-tooltip="番号・著者・年で検索し、問題または未引用の文献だけに絞り込めます。Crossref検索を有効にすると、外部データベースからタイトル・DOI・URLの候補を取得します。">?</span></summary>
-            <div class="reference-controls" aria-label="引用文献の表示設定">
-              <label class="reference-search">検索<input id="reference-search" type="search" placeholder="番号・著者・年" aria-label="引用文献を検索" /></label>
-              <label>表示<select id="reference-filter" aria-label="引用文献の絞り込み"><option value="all">すべて</option><option value="issues">問題のみ</option><option value="uncited">未引用のみ</option></select></label>
-              <label>著者<select id="reference-authors" aria-label="著者の表示方法"><option value="short">先頭著者のみ</option><option value="all">全員</option></select></label>
-              <label class="crossref-enable"><input id="crossref-enabled" type="checkbox" /> Crossref検索を有効にする</label>
-              <p id="crossref-status" class="crossref-status" aria-live="polite" hidden></p>
+        <details class="compound-section">
+          <summary><span>引用文献一覧</span><span id="count-references" class="section-count"></span><span class="reference-search-wrap">
+            <!-- 検索は押したときだけ出す。畳んだ節として置いていたときは、
+                 一覧より先にその見出しが目に入っていた。見え方の設定は
+                 タイトル行の歯車へ移した（虫眼鏡は探すための道具）。 -->
+            <button id="reference-search-toggle" type="button" class="icon-button subtle" aria-expanded="false"
+                    aria-label="検索・絞り込み" title="検索・絞り込み">
+              <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false">
+                <circle cx="7" cy="7" r="4.2" fill="none" stroke="currentColor" stroke-width="1.6" />
+                <path d="M10.2 10.2 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+              </svg>
+            </button>
+            <div id="reference-search-popover" class="reference-popover" role="dialog" aria-label="引用文献を検索" hidden>
+              <!-- 欄を 4 つに分けてある。1 つの欄に「番号・著者・年」と書いて
+                   あった頃は、3 つ全部を入れねばならないのか、どれか 1 つでよいのか
+                   が読めなかった。欄が分かれていれば、何を入れる場所かは見れば
+                   分かり、入れなかった欄が条件にならないことも形で伝わる。 -->
+              <p id="reference-search-hint" class="reference-search-hint">
+                <strong>入れた欄だけ</strong>で絞り込みます。空欄は条件になりません。
+              </p>
+              <label>番号<input id="reference-search-number" type="search" inputmode="numeric"
+                     placeholder="12" aria-describedby="reference-search-hint" /></label>
+              <label>年<input id="reference-search-year" type="search" inputmode="numeric"
+                     placeholder="2019" aria-describedby="reference-search-hint" /></label>
+              <label class="reference-search">著者<input id="reference-search-author" type="search"
+                     placeholder="Tanaka" aria-describedby="reference-search-hint" /></label>
+              <label class="reference-search">誌名<input id="reference-search-journal" type="search"
+                     placeholder="Angew" aria-describedby="reference-search-hint" /></label>
+              <p id="reference-search-count" class="reference-search-count" aria-live="polite"></p>
+              <button id="reference-search-clear" type="button" class="reference-search-clear" hidden>クリア</button>
             </div>
-          </details>
+          </span><span class="section-help" role="img" tabindex="0" aria-label="引用文献一覧の説明" data-tooltip="本文の引用と末尾の文献リストを照合します。カードの空いている部分を押して文献を選び、場所のボタン（p. がページ、¶ が段落）で本文の引用箇所へ移動します。文献リストへはタイトル行の本のボタンから移動できます。">?</span></summary>
+          <div id="reference-tools" class="figure-tools" hidden>
+            <button id="reference-filter-all" type="button" class="figure-chip" aria-pressed="true">すべて</button>
+            <button id="reference-filter-issue" type="button" class="figure-chip" aria-pressed="false" hidden>問題あり</button>
+            <button id="reference-filter-uncited" type="button" class="figure-chip" aria-pressed="false" hidden>未引用</button>
+            <!-- Crossref の候補と、年・巻・ページ・誌名・筆頭著者が食い違うもの。
+                 Crossref が有効で、1 件でもあるときだけ出る。「相違」ではなく
+                 「要確認」なのは、直すべきなのが原稿とは限らないから —— 候補の
+                 ほうが別の論文であることがある。 -->
+            <button id="reference-filter-mismatch" type="button" class="figure-chip" aria-pressed="false" hidden>要確認</button>
+          </div>
+          <!-- Crossref の進み具合。走っているあいだだけ出る。小窓の中に置いて
+               いた頃は、2 分かかる処理の進行が小窓を開けている人にしか見えず、
+               「押したのに何も起きない」ように見えていた。 -->
+          <p id="crossref-status" class="crossref-status" aria-live="polite" hidden></p>
           <div id="references"></div>
         </details>
         <details class="compound-section">
@@ -192,16 +347,23 @@
         </details>
       </div>
 
+      <!-- 引っかかりの数え上げは、タイトル下の 1 行（setScanStatus）が言う。
+           以前は琥珀の帯をここに立てていたが、「本文で参照なし 5 件。」の 1 文が
+           一覧そのものより目立っていた。文献一覧と同じで、数えた結果に続けて
+           書けば足りる。 -->
       <div id="view-figures" hidden>
-        <details class="compound-section" open>
-          <summary><span>図・表一覧</span><span class="section-help" role="img" tabindex="0" aria-label="図・表一覧の説明" data-tooltip="本文に出てくる Figure、Fig.、Table、図、表の番号を集めます。キャプションと本文中の参照を番号ごとに分け、各場所のボタンから該当箇所へ移動できます。">?</span></summary>
-          <div id="figures"></div>
-        </details>
+        <div id="figure-tools" class="figure-tools" hidden>
+          <button id="figure-filter-all" type="button" class="figure-chip" aria-pressed="true">すべて</button>
+          <button id="figure-filter-issue" type="button" class="figure-chip" aria-pressed="false" hidden>問題あり</button>
+          <button id="figure-sort" type="button" class="figure-chip" aria-pressed="false" hidden>本文の出現順</button>
+          <span class="section-help" role="img" tabindex="0" aria-label="図・表一覧の説明" data-tooltip="本文に出てくる Figure、Table、Scheme、Chart、Equation と 図・表・スキーム の番号を、種類ごとに一覧します。キャプションと本文中の参照は分けて表示し、場所のボタン（p. がページ、¶ が段落）からその場所へ移動できます。キャプションが図の中に画像として入っている場合や、テキストボックス内にある場合は検出できません。">?</span>
+        </div>
+        <div id="figures"></div>
       </div>
 
       <div id="view-fonts" hidden>
-        <details class="font-section" open>
-          <summary>フォントの種類</summary>
+        <details class="font-section">
+          <summary>フォントの種類<span id="count-font-names" class="section-count"></span></summary>
           <p class="lead">使われている書体、使用箇所数、文字数、書体の種類を一覧します。</p>
           <p id="font-summary" class="font-summary"></p>
           <div id="font-usage" class="font-usage-grid"></div>
@@ -234,8 +396,8 @@
             <button id="font-highlight" type="button" class="primary">本文で強調</button>
           </div>
         </details>
-        <details class="font-section" open>
-          <summary>書体の種類</summary>
+        <details class="font-section">
+          <summary>書体の種類<span id="count-font-styles" class="section-count"></span></summary>
           <p class="lead">太字、斜体、上付き、下付きになっている文字数を一覧します。</p>
           <p id="style-summary" class="font-summary"></p>
           <div id="style-usage" class="style-usage"></div>
@@ -269,6 +431,18 @@
           </div>
         </details>
         <details class="font-section">
+          <summary>文字サイズの種類<span id="count-font-sizes" class="section-count"></span></summary>
+          <p class="lead">使われている文字サイズと、その文字数を一覧します。同じ書体でもサイズが混ざっていると、ここで分かれて出ます。</p>
+          <p id="size-summary" class="font-summary"></p>
+          <div id="size-usage" class="style-usage"></div>
+        </details>
+        <details class="font-section">
+          <summary>文字色の種類<span id="count-font-colors" class="section-count"></span></summary>
+          <p class="lead">使われている文字色と、その文字数を一覧します。推敲中の色が残っていれば、ここに出ます。</p>
+          <p id="color-summary" class="font-summary"></p>
+          <div id="color-usage" class="style-usage"></div>
+        </details>
+        <details class="font-section">
           <summary>スペースを強調</summary>
           <p class="lead">半角スペースと全角スペースを別々の色で強調します。Word が利用できるマーカー色から選べます。</p>
           <div class="font-controls font-highlight-controls">
@@ -297,73 +471,74 @@
         </details>
       </div>
 
-      <!-- リボンの［使い方］と、点検前の案内の［使い方をひらく］から。
-           初見の人がボタン 15 個を前にして最初の一手を決められなかった、
-           という実機での指摘に対する答え。 -->
-      <div id="view-help" hidden>
-        <h2>使い方</h2>
+      <!--
+        パネルを開いた直後の画面。ほかにリボンの［使い方］と、点検前の案内の
+        ［使い方をひらく］から。初見の人がリボンを前にして最初の一手を決められ
+        なかった、という実機での指摘に対する答え。
 
-        <h3>まずこれだけ</h3>
-        <ol class="help">
-          <li>原稿を開いて、リボンの<strong>［文書をチェック］</strong>を押します。</li>
-          <li>指摘がこのパネルに、<strong>分類 → ルール</strong>の 2 段で並びます。</li>
-          <li>各指摘の<strong>［文書内で表示］</strong>でその箇所へ飛べます。</li>
-          <li>直すなら<strong>［修正］</strong>、要らない指摘は<strong>［無視］</strong>。</li>
-        </ol>
-        <p class="lead">
-          同じルールの指摘は 1 つの見出しにまとまります。見出しの
-          <strong>［まとめて修正］</strong>で、そのルールの分だけ一括で直せます。
-          文書全体を一度に直すボタンは、意図的に置いていません。
+        **畳まない。文を短くする。** 一度アコーディオンにしたが、読むのに開く手間が
+        要るうえ、畳んだ見出しからは中身が分からない。長さは文を削って詰める。
+        書いていないことは、ボタンのツールチップ（マニフェスト）と README にある。
+
+        見出しの重複も外した — パネルのタイトルがすでに「使い方」なので、
+        中で <h2>使い方</h2> をもう一度言う必要はない。
+      -->
+      <div id="view-help">
+        <!-- ここが答えるのは「どこを押すのか」。初見の人に足りないのは操作の順番
+             ではなく、操作の入口がリボンで、出口がこのパネルだという枠組みだった。 -->
+        <p class="help-intro">
+          操作は<strong>上のリボン</strong>から行います。ボタンを押すと、結果がこのパネルに出ます。
+          それぞれのボタンでできることは次のとおりです。
         </p>
 
-        <h3>指摘を原稿に残す</h3>
-        <p class="lead">
-          <strong>［指摘をマーカーで塗る］</strong>は分類ごとの色を塗るだけ。
-          <strong>［指摘をコメントとして挿入］</strong>は指摘文を Word のコメントとして付けるので、
-          返信や解決といった校閲機能がそのまま使えます。他人の原稿を返すときは後者が伝わります。
+        <!-- リボンの並び順そのままに並べる。「文字」「化合物」が何をするものか
+             分からない、という指摘に対する答えなので、順番を勝手に変えないこと。 -->
+        <dl class="ribbon-help">
+          <dt>文書をチェック</dt>
+          <dd>点検する。メニューから、点検せずに前回の結果へも戻れる</dd>
+
+          <dt>指摘を反映</dt>
+          <dd>指摘を原稿に書き込む。マーカーは色だけ、コメントは指摘文ごと</dd>
+
+          <dt>反映を削除</dt>
+          <dd>書き込んだ塗り・コメントを消す。<strong class="danger">「全て削除」は共著者の分も消える</strong>（戻すのは ⌘Z）</dd>
+
+          <dt>設定</dt>
+          <dd>点検するルール、マーカーの色、長すぎる文の字数</dd>
+
+          <dt>文字</dt>
+          <dd>フォントと太字・斜体の一覧。まとめて置換、色つきで強調</dd>
+
+          <dt>化合物</dt>
+          <dd>番号ごとの回数と場所。1 回だけの番号が分かる。挿入・一括変更も</dd>
+
+          <dt>文献</dt>
+          <dd>引用番号と書誌。書誌の無い番号と、引用されていない文献に印</dd>
+
+          <dt>図・表</dt>
+          <dd>図表番号の一覧。キャプション無し・参照無し・番号の抜けが先頭</dd>
+
+          <dt>使い方</dt>
+          <dd>この画面</dd>
+        </dl>
+
+        <!-- 「押すたびに数え直す」をやめた分、数字が古くなりうることは書いておく。 -->
+        <p class="help-intro">
+          <strong>［文字］［化合物］［文献］［図・表］の一覧は、最初に押したときだけ数えます。</strong>
+          2 回目からはその一覧を開くだけなので待ち時間がありません。原稿を直したあとで数え直すには、
+          パネルの見出しの右にある<strong>更新ボタン（↻）</strong>を押します。数字がいつのものかは、
+          その左の「10:42 現在」が示します。
         </p>
 
-        <h3>⚠️ 消すボタンは 2 種類あります</h3>
-        <table class="help">
-          <tr><th>ボタン</th><th>消える範囲</th></tr>
-          <tr><td>アドインの塗りを削除</td><td>このアドインが塗った箇所だけ</td></tr>
-          <tr><td><strong>ハイライトを全て削除</strong></td><td><strong>文書の全部</strong>（共著者の塗りも）</td></tr>
-          <tr><td>アドインのコメント削除</td><td>このアドインのコメントだけ</td></tr>
-          <tr><td><strong>コメントを全て削除</strong></td><td><strong>文書の全部</strong>（他人のコメントも）</td></tr>
-        </table>
-        <p class="lead">下 2 つを押してしまったときは ⌘Z で戻せます。</p>
-
-        <h3>数える 4 つの一覧</h3>
-        <ul class="help">
-          <li><strong>［化合物］</strong> — 番号ごとの回数と場所。1 回しか出てこない番号が分かります。</li>
-          <li><strong>［文献］</strong> — 引用番号と書誌。書誌の無い番号、引用されていない文献に印。</li>
-          <li><strong>［図・表］</strong> — キャプションと本文中の図表番号を、番号ごとに一覧。</li>
-          <li><strong>［文字］</strong> — フォントと文字装飾を一覧・置換・強調。</li>
-        </ul>
-        <p class="lead">どれも［← 指摘一覧に戻る］で戻れます。</p>
-
-        <h3>点検する項目を選ぶ</h3>
+        <!-- 点検そのものの話（読み方・所要時間・無視の残りかた）は点検結果パネルの
+             「はじめに」へ移した。ここに残すのは、リボンの話だけ。 -->
         <p class="lead">
-          <strong>［ルール設定］</strong>が「何を点検するか」、<strong>［設定］</strong>が
-          「どう点検して、どう見せるか」（マーカーの色・長すぎる文の字数・欧文フォント）です。
-          設定はこの Mac にだけ保存されます。
+          新規文書ではリボンにタブが出ません。一度このアドインを使った文書には、次から出ます。
         </p>
 
-        <h3>知っておくと困らないこと</h3>
-        <ul class="help">
-          <li>点検は<strong>1 ページあたり数秒</strong>かかります。論文 1 本なら分単位になるので、
-            進行の表示が出ているあいだは待ってください。</li>
-          <li><strong>［無視］した指摘は原稿ファイルに残ります。</strong>次に同じ原稿を開いたときも
-            無視のままです。原稿を保存したときに一緒に書き込まれます。</li>
-          <li>無視の記録は原稿と一緒に動きます。<strong>共著者に原稿を渡すと、相手の画面でも
-            その指摘は出ません。</strong>［すべて戻す］で全部消せます。</li>
-          <li>新規文書ではリボンのタブが出ません。一度このアドインを使った文書には、次から出ます。</li>
-        </ul>
-
-        <h3>バージョン</h3>
         <!-- 更新の案内は古いときしか出ないので、そのままだと「入れ直したのに
              変わったのか分からない」。ここは最新でも古くても必ず出す。 -->
-        <p id="help-version" class="lead">確認しています…</p>
+        <p id="help-version" class="help-version">確認しています…</p>
       </div>
     </main>
   </body>

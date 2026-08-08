@@ -16,6 +16,23 @@
     <div id="settings-tabs" class="tabs"></div>
 
     <div class="dialog-body">
+      <!-- 点検するルール（もとは独立した［ルール設定］の窓だった）。
+           2 つの窓は同じ設定を編集していて、開くのに別のボタンが要るだけ
+           だったので、この窓のタブに畳んだ。中身は src/dialog/rules.ts。 -->
+      <section id="panel-rules">
+        <p class="lead">外したルールは点検されません。</p>
+        <div class="row compact">
+          <button id="rule-all-on" type="button">すべて有効</button>
+          <button id="rule-all-off" type="button">すべて無効</button>
+          <button id="rule-reset" type="button">既定に戻す</button>
+          <span id="rule-count" class="rule-count"></span>
+        </div>
+
+        <!-- One sub-tab per checklist category; filled by rules.ts. -->
+        <div id="rule-tabs" class="tabs subtabs"></div>
+        <div id="rule-panels"></div>
+      </section>
+
       <!-- マーカーの色 -->
       <section id="panel-colors">
         <p class="lead">
@@ -49,6 +66,22 @@
 
         <label class="check"><input id="selection-only" type="checkbox" /> 選択範囲のみを点検する</label>
         <label class="check"><input id="track-changes" type="checkbox" /> 修正を変更履歴として記録する</label>
+      </section>
+
+      <!-- 更新履歴。パネルの更新の知らせは一言しか言えないので、
+           「前は何が変わったのか」はここが引き受ける。中身は
+           src/core/changelog.ts。 -->
+      <section id="panel-changelog">
+        <p class="lead">
+          点検のルールは、パネルを開くたび自動で最新になります。<strong>リボンが変わった回だけ</strong>、
+          マニフェストを入れ直す必要があります（下の「入れ直しが必要」の印）。
+        </p>
+        <p id="changelog-state" class="changelog-state">確認しています…</p>
+        <div class="row compact">
+          <button id="changelog-download" type="button" class="primary" hidden>ダウンロードページを開く</button>
+        </div>
+        <p id="changelog-url" class="update-url" hidden></p>
+        <div id="changelog"></div>
       </section>
     </div>
 
